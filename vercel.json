@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/market/forex",
+      "destination": "/api/market/forex"
+    },
+    {
+      "source": "/api/market/stocks",
+      "destination": "/api/market/stocks"
+    },
+    {
+      "source": "/api/market/sync",
+      "destination": "/api/market/sync"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

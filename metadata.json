@@ -1,0 +1,6 @@
+{
+  "name": "Econ Matrix - Financial & Economic Intelligence",
+  "description": "Sri Lanka's premier financial media platform with real-time CSE market tickers, macroeconomic insights, and Gemini AI newsroom intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
