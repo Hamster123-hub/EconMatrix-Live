@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
+import { renderArticleParagraph } from '../utils/articleRenderer';
 
 interface ArticleModalProps {
   article: Article | null;
@@ -448,7 +449,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             <div className="space-y-5 font-sans text-[15px] sm:text-[16px] text-slate-800 leading-[1.75]">
               {paragraphs.map((para, idx) => (
                 <p key={idx} className="leading-[1.75]">
-                  {para}
+                  {renderArticleParagraph(para, false)}
                 </p>
               ))}
             </div>

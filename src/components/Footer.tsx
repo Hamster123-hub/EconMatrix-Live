@@ -14,7 +14,6 @@ import {
   Facebook,
   PhoneCall,
   MessageCircle,
-  Phone,
   User,
   ArrowRight
 } from 'lucide-react';
@@ -223,12 +222,12 @@ export const Footer: React.FC<FooterProps> = ({
 
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">
-                  Disnaka Seneviratne
+                  Disnaka
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 font-medium">
                   Direct Line:{' '}
                   <a 
-                    href="tel:0771774033" 
+                    href="tel:+94771774033" 
                     className="text-amber-400 hover:text-amber-300 font-mono font-bold text-base sm:text-lg underline ml-1"
                   >
                     0771774033
@@ -252,19 +251,10 @@ export const Footer: React.FC<FooterProps> = ({
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] hover:bg-[#20ba59] text-slate-950 font-black text-xs uppercase tracking-wider rounded-xs transition shadow-md cursor-pointer"
-                title="Chat with Disnaka Seneviratne on WhatsApp"
+                title="Chat with Disnaka on WhatsApp"
               >
                 <MessageCircle className="w-4 h-4 fill-current" />
                 <span>WhatsApp (0771774033)</span>
-              </a>
-
-              <a
-                href="tel:0771774033"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider rounded-xs transition shadow-sm cursor-pointer"
-                title="Call 0771774033 directly"
-              >
-                <Phone className="w-3.5 h-3.5" />
-                <span>Call Now</span>
               </a>
 
               {onSelectTab && (
@@ -288,7 +278,7 @@ export const Footer: React.FC<FooterProps> = ({
             <p>© 2026 Econ Matrix Publishing Company. All rights reserved.</p>
             <span className="hidden sm:inline text-slate-600">•</span>
             <span className="text-slate-300">
-              Direct Contact: <strong className="text-white">Disnaka Seneviratne</strong> (<a href="tel:0771774033" className="text-amber-400 hover:underline">0771774033</a> • WhatsApp Available)
+              Direct Contact: <strong className="text-white">Disnaka</strong> (<a href="tel:+94771774033" className="text-amber-400 hover:underline">0771774033</a> • WhatsApp Available)
             </span>
           </div>
           

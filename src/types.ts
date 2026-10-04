@@ -189,6 +189,8 @@ export interface EconBook {
   fileFormat: string;
   isFeatured?: boolean;
   priceLKR?: number;
+  isPaidBook?: boolean;
+  allowDownload?: boolean;
   pages?: BookPage[];
   fullRawText?: string;
 }

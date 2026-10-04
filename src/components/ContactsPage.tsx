@@ -35,10 +35,10 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const contactName = "Disnaka Seneviratne";
+  const contactName = "Disnaka";
   const mobileNumber = "0771774033";
   const intlMobileNumber = "+94771774033";
-  const whatsappUrl = "https://wa.me/94771774033";
+  const whatsappUrl = `https://wa.me/94771774033`;
 
   const handleCopyNumber = () => {
     navigator.clipboard.writeText(mobileNumber);
@@ -154,7 +154,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <a
-                  href={`tel:${mobileNumber}`}
+                  href={`tel:${intlMobileNumber}`}
                   className="text-2xl sm:text-3xl font-mono font-extrabold text-amber-400 hover:text-amber-300 tracking-wider transition underline decoration-amber-500/40"
                   title="Click to call directly"
                 >
@@ -207,7 +207,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({
 
             {/* Direct Phone Call Action */}
             <a
-              href={`tel:${mobileNumber}`}
+              href={`tel:${intlMobileNumber}`}
               className="flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xs bg-[#0284C7] hover:bg-sky-600 text-white font-black text-sm uppercase tracking-wider transition shadow-md cursor-pointer"
             >
               <Phone className="w-4 h-4" />
@@ -216,7 +216,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({
 
             {/* Quick SMS Action */}
             <a
-              href={`sms:${mobileNumber}`}
+              href={`sms:${intlMobileNumber}`}
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition border border-slate-600 cursor-pointer"
             >
               <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
@@ -250,7 +250,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({
                 <h4 className="font-bold text-base">Message Dispatched Successfully</h4>
               </div>
               <p className="text-xs text-emerald-700 dark:text-emerald-400 leading-relaxed">
-                Thank you for reaching out to Disnaka Seneviratne. For immediate urgent follow-up, you can also connect directly on WhatsApp at <strong>{mobileNumber}</strong>.
+                Thank you for reaching out to Disnaka. For immediate urgent follow-up, you can also connect directly on WhatsApp at <strong>{mobileNumber}</strong>.
               </p>
               <button
                 type="button"

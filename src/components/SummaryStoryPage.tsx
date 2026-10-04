@@ -134,7 +134,7 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
   });
 
   // Theme Style
-  const [storyStyle, setStoryStyle] = useState<'navy_gold' | 'deep_emerald' | 'maroon_executive' | 'dark_editorial'>('navy_gold');
+  const [storyStyle, setStoryStyle] = useState<'navy_gold' | 'deep_emerald' | 'executive_blue' | 'dark_editorial'>('navy_gold');
 
   // Font scale preference (normal 30px clear, large 35px extra legible, extra_large 40px, compact 25px, auto)
   const [fontScaling, setFontScaling] = useState<'auto' | 'compact' | 'normal' | 'large' | 'extra_large'>('normal');
@@ -307,27 +307,27 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       highlightText: '#064E3B',
       footerBadge: '#064E3B',
     },
-    maroon_executive: {
-      name: 'Maroon Executive & Amber',
-      bgTop: '#450A0A',
-      bgMid: '#2B0606',
-      bgBottom: '#130202',
-      cardBg: '#FFFDFB',
-      cardBorder: '#881337',
-      innerBorder: '#FB7185',
-      headerBg: '#881337',
-      headerText: '#FFE4E6',
-      titleText: '#1E1B4B',
-      chipBg: '#881337',
-      chipText: '#FECDD3',
-      chipBorder: '#F43F5E',
-      narrativeBg: '#FFF1F2',
-      narrativeBorder: '#FECDD3',
-      narrativeText: '#1F2937',
-      highlightBg: '#FFE4E6',
-      highlightBorder: '#E11D48',
-      highlightText: '#881337',
-      footerBadge: '#881337',
+    executive_blue: {
+      name: 'Executive Blue & Azure',
+      bgTop: '#0B2545',
+      bgMid: '#08192E',
+      bgBottom: '#030C18',
+      cardBg: '#F8FAFC',
+      cardBorder: '#0284C7',
+      innerBorder: '#38BDF8',
+      headerBg: '#0284C7',
+      headerText: '#FFFFFF',
+      titleText: '#0F172A',
+      chipBg: '#0369A1',
+      chipText: '#F0F9FF',
+      chipBorder: '#38BDF8',
+      narrativeBg: '#F0F9FF',
+      narrativeBorder: '#BAE6FD',
+      narrativeText: '#0F172A',
+      highlightBg: '#E0F2FE',
+      highlightBorder: '#0284C7',
+      highlightText: '#0369A1',
+      footerBadge: '#0284C7',
     },
     dark_editorial: {
       name: 'Dark Broadsheet Charcoal',
@@ -561,7 +561,7 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     canvas.width = width;
     canvas.height = height;
 
-    const palette = palettes[storyStyle] || palettes.navy_gold;
+    const palette = palettes[storyStyle] || (palettes as Record<string, any>)['executive_blue'] || palettes.navy_gold;
 
     // 1. Background Gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
@@ -619,22 +619,22 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     // Handle & Verified Checkmark
     ctx.textAlign = 'left';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 30px system-ui, -apple-system, sans-serif';
+    ctx.font = '800 33px system-ui, -apple-system, sans-serif';
     ctx.fillText('lankaecon.lk', 150, 98);
 
     ctx.fillStyle = '#38BDF8';
     ctx.beginPath();
-    ctx.arc(348, 93, 12, 0, Math.PI * 2);
+    ctx.arc(354, 93, 12, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#0B1E36';
     ctx.font = '900 15px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('✓', 348, 98);
+    ctx.fillText('✓', 354, 98);
 
     // Subtitle & Slide indicator
     ctx.textAlign = 'left';
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '600 19px monospace';
+    ctx.font = '600 21px monospace';
     const slideSubtitle = totalSlides > 1
       ? `Executive Summary • Slide ${currentSlide + 1} of ${totalSlides}`
       : 'Executive Summary Story • Official Dispatch';
@@ -676,15 +676,15 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
 
     // 6. Header Tag inside Card
     ctx.fillStyle = palette.headerBg;
-    roundRect(ctx, cardX + 26, cardY + 22, 430, 42, 8);
+    roundRect(ctx, cardX + 26, cardY + 22, 440, 44, 8);
     ctx.fill();
     ctx.fillStyle = palette.headerText;
-    ctx.font = '900 17px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 19px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'left';
     const cardHeaderBadge = totalSlides > 1
       ? `🇱🇰 LANKAECON • SUMMARY (${currentSlide + 1}/${totalSlides})`
       : '🇱🇰 LANKAECON • EXECUTIVE SUMMARY';
-    ctx.fillText(cardHeaderBadge, cardX + 40, cardY + 49);
+    ctx.fillText(cardHeaderBadge, cardX + 40, cardY + 50);
 
     // Category Tag on right
     const categoryName = (category || 'ECONOMY').toUpperCase();
@@ -696,30 +696,30 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     roundRect(ctx, cardX + cardW - 260, cardY + 20, 234, 46, 8);
     ctx.stroke();
     ctx.fillStyle = palette.cardBorder;
-    ctx.font = '900 18px monospace';
+    ctx.font = '900 20px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(categoryName, cardX + cardW - 143, cardY + 50);
 
     // Byline & Date line - bolder and larger for crisp mobile viewing
     ctx.textAlign = 'left';
     ctx.fillStyle = '#334155';
-    ctx.font = 'bold 18px monospace';
+    ctx.font = 'bold 20px monospace';
     ctx.fillText(
       `BY ${byline.toUpperCase()} • ${dateline.toUpperCase()} • ${readTime.toUpperCase()}`,
       cardX + 30,
-      cardY + 96
+      cardY + 97
     );
 
     let curY = cardY + 144;
 
     // 7. Headline Rendering - Bold, prominent and effortlessly legible
     ctx.fillStyle = palette.titleText;
-    ctx.font = 'bold 44px "Georgia", "Times New Roman", serif';
+    ctx.font = 'bold 47px "Georgia", "Times New Roman", serif';
     const headlineLines = breakTextIntoLines(ctx, headline, cardW - 60);
     const headlineToDraw = headlineLines.slice(0, 3);
     headlineToDraw.forEach((line) => {
       ctx.fillText(line, cardX + 30, curY);
-      curY += 54;
+      curY += 57;
     });
     curY += 12;
 
@@ -730,7 +730,7 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       const metricsToDraw = keyMetrics.slice(0, 5);
 
       metricsToDraw.forEach((num) => {
-        ctx.font = '900 20px monospace';
+        ctx.font = '900 22px monospace';
         const textWidth = ctx.measureText(num).width;
         const pillW = textWidth + 28;
 
@@ -769,14 +769,14 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
 
     // Narrative Container Title Banner
     ctx.fillStyle = palette.headerBg;
-    roundRect(ctx, pointsBoxX + 16, pointsBoxY + 14, 470, 36, 6);
+    roundRect(ctx, pointsBoxX + 16, pointsBoxY + 14, 480, 38, 6);
     ctx.fill();
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 15px monospace';
+    ctx.font = '900 17px monospace';
     const bannerLabel = totalSlides > 1
       ? `⚡ VERIFIED ECONOMIC SUMMARY • PART ${currentSlide + 1} OF ${totalSlides}`
       : '⚡ VERIFIED ECONOMIC SUMMARY • COLOMBO';
-    ctx.fillText(bannerLabel, pointsBoxX + 28, pointsBoxY + 38);
+    ctx.fillText(bannerLabel, pointsBoxX + 28, pointsBoxY + 39);
 
     // Continuation pill tag if multiple slides
     if (totalSlides > 1) {
@@ -787,17 +787,17 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
         : `CONTINUES (PART ${currentSlide + 1}/${totalSlides}) ➔`;
 
       ctx.fillStyle = '#FEF3C7';
-      const tagW = 210;
-      roundRect(ctx, pointsBoxX + pointsBoxW - tagW - 16, pointsBoxY + 14, tagW, 36, 6);
+      const tagW = 216;
+      roundRect(ctx, pointsBoxX + pointsBoxW - tagW - 16, pointsBoxY + 14, tagW, 38, 6);
       ctx.fill();
       ctx.strokeStyle = '#D97706';
       ctx.lineWidth = 1.5;
-      roundRect(ctx, pointsBoxX + pointsBoxW - tagW - 16, pointsBoxY + 14, tagW, 36, 6);
+      roundRect(ctx, pointsBoxX + pointsBoxW - tagW - 16, pointsBoxY + 14, tagW, 38, 6);
       ctx.stroke();
       ctx.fillStyle = '#92400E';
-      ctx.font = '900 13px monospace';
+      ctx.font = '900 14.5px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(continuationTag, pointsBoxX + pointsBoxW - tagW / 2 - 16, pointsBoxY + 37);
+      ctx.fillText(continuationTag, pointsBoxX + pointsBoxW - tagW / 2 - 16, pointsBoxY + 38);
       ctx.textAlign = 'left';
     }
 
@@ -812,9 +812,9 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     const paragraphTextWidth = maxTextWidth - 46; // 838px
 
     // Define bottom anchors
-    const continueBoxH = 52;
+    const continueBoxH = 54;
     const continueBoxY = pointsBoxY + pointsBoxH - continueBoxH - 16;
-    const takeawayBoxH = 126;
+    const takeawayBoxH = 130;
     const takeawayBoxY = pointsBoxY + pointsBoxH - takeawayBoxH - 16;
 
     const textStartY = pointsBoxY + 76;
@@ -827,17 +827,17 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       availTextH = (pointsBoxY + pointsBoxH - 24) - textStartY;
     }
 
-    // Determine font size, line-height and paragraph spacing
-    const targetBaseF = fontScaling === 'compact' ? 24 : fontScaling === 'large' ? 32 : fontScaling === 'extra_large' ? 37 : 28;
-    const maxTestF = fontScaling === 'auto' ? 36 : targetBaseF;
+    // Determine font size, line-height and paragraph spacing (very slightly enlarged)
+    const targetBaseF = fontScaling === 'compact' ? 27.5 : fontScaling === 'large' ? 36 : fontScaling === 'extra_large' ? 42 : 32;
+    const maxTestF = fontScaling === 'auto' ? 40 : targetBaseF;
 
-    let fontSize = 26;
-    let baseLineHeight = 38;
-    let baseParaGap = 18;
+    let fontSize = 30;
+    let baseLineHeight = 43;
+    let baseParaGap = 20;
     let linesByPara: string[][] = [];
 
-    // Dynamically find the best font size (from maxTestF down to 19px) that fits cleanly into availTextH
-    for (let testF = maxTestF; testF >= 19; testF -= 1) {
+    // Dynamically find the best font size (from maxTestF down to 21px) that fits cleanly into availTextH
+    for (let testF = maxTestF; testF >= 21; testF -= 1) {
       ctx.font = `600 ${testF}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
       const testLineH = Math.round(testF * 1.44);
       const testGap = Math.round(testF * 0.65);
@@ -851,7 +851,7 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       }
 
       const naturalH = (totalLines * testLineH) + (Math.max(0, paragraphsToDraw.length - 1) * testGap);
-      if (naturalH <= availTextH || testF === 19) {
+      if (naturalH <= availTextH || testF === 21) {
         fontSize = testF;
         baseLineHeight = testLineH;
         baseParaGap = testGap;
@@ -862,9 +862,9 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
 
     // Fallback if no lines computed
     if (linesByPara.length === 0) {
-      fontSize = 21;
-      baseLineHeight = 32;
-      baseParaGap = 16;
+      fontSize = 24.5;
+      baseLineHeight = 36;
+      baseParaGap = 18;
       ctx.font = `600 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
       for (const p of paragraphsToDraw) {
         linesByPara.push(breakTextIntoLines(ctx, p, paragraphTextWidth));
@@ -903,19 +903,19 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
 
       // Paragraph numbering badge
       ctx.fillStyle = palette.headerBg;
-      roundRect(ctx, pointsBoxX + 22, textY - 24, 34, 34, 6);
+      roundRect(ctx, pointsBoxX + 22, textY - 25, 36, 36, 6);
       ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 17px monospace';
+      ctx.font = 'bold 19px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`${globalBulletNum}`, pointsBoxX + 39, textY - 1);
+      ctx.fillText(`${globalBulletNum}`, pointsBoxX + 40, textY - 1);
       ctx.textAlign = 'left';
 
       // Lines
       ctx.fillStyle = palette.narrativeText;
       ctx.font = `600 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
       pLines.forEach((line) => {
-        ctx.fillText(line, pointsBoxX + 70, textY);
+        ctx.fillText(line, pointsBoxX + 72, textY);
         textY += lineHeight;
       });
 
@@ -933,15 +933,15 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       ctx.stroke();
 
       ctx.fillStyle = palette.highlightText;
-      ctx.font = '900 17px monospace';
-      ctx.fillText('💡 STRATEGIC TAKEAWAY FOR SRI LANKA ENTERPRISE:', pointsBoxX + 36, takeawayBoxY + 30);
+      ctx.font = '900 19px monospace';
+      ctx.fillText('💡 STRATEGIC TAKEAWAY FOR SRI LANKA ENTERPRISE:', pointsBoxX + 36, takeawayBoxY + 31);
 
-      ctx.font = 'bold 23px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.font = 'bold 26px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
       const takeawayLines = breakTextIntoLines(ctx, sectorTakeaway, pointsBoxW - 76);
-      let tY = takeawayBoxY + 64;
+      let tY = takeawayBoxY + 65;
       takeawayLines.slice(0, 2).forEach((tLine) => {
         ctx.fillText(tLine, pointsBoxX + 36, tY);
-        tY += 32;
+        tY += 35;
       });
     } else if (!isLastSlide) {
       // Continuation banner at the bottom of intermediate slides
@@ -954,12 +954,12 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
       ctx.stroke();
 
       ctx.fillStyle = '#FDE047';
-      ctx.font = '900 18px monospace';
+      ctx.font = '900 20px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(
         `👉 STORY CONTINUES ON SLIDE ${currentSlide + 2} OF ${totalSlides} (SWIPE NEXT)`,
         pointsBoxX + pointsBoxW / 2,
-        continueBoxY + 33
+        continueBoxY + 34
       );
       ctx.textAlign = 'left';
     }
@@ -967,7 +967,7 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     // 11. Subtle Bottom Dateline Stamp (Maximized space - removed "Follow LankaEcon.lk on Instagram")
     const footerY = height - 32;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-    ctx.font = '600 16px monospace';
+    ctx.font = '600 18px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('LankaEcon.lk • Colombo Financial Desk • Tap link in bio for full report', width / 2, footerY);
 
@@ -1520,9 +1520,9 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
                       className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-xs cursor-pointer ${
                         fontScaling === 'normal' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
                       }`}
-                      title="30px Clear Font"
+                      title="32px Clear Font"
                     >
-                      30px
+                      32px
                     </button>
                     <button
                       type="button"
@@ -1530,9 +1530,9 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
                       className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-xs cursor-pointer ${
                         fontScaling === 'large' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
                       }`}
-                      title="35px Large & Extra Legible"
+                      title="36px Large & Extra Legible"
                     >
-                      35px
+                      36px
                     </button>
                     <button
                       type="button"
@@ -1540,9 +1540,9 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
                       className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-xs cursor-pointer ${
                         fontScaling === 'extra_large' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
                       }`}
-                      title="40px Maximum Impact"
+                      title="42px Maximum Impact"
                     >
-                      40px
+                      42px
                     </button>
                   </div>
                 </div>

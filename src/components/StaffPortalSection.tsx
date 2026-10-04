@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { EmployeeRecord, PublisherSubmission, PayoutRecord, MediaAsset } from '../types';
-import { Shield, Plus, Sparkles, CheckCircle2, Image as ImageIcon, BookOpen, Feather, Newspaper, Send, Search, Video, Award, Users, UserCheck, AlertTriangle, FileText, Lock, Landmark, Calculator, Trash2, Mail, Instagram, Megaphone, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, RotateCcw, Calendar, User, Edit3, Edit, Save, Globe, Eye, Check, Loader2, UploadCloud, FileUp } from 'lucide-react';
+import { Shield, Plus, Sparkles, CheckCircle2, Image as ImageIcon, BookOpen, Feather, Newspaper, Send, Search, Video, Award, Users, UserCheck, AlertTriangle, FileText, Lock, Landmark, Calculator, Trash2, Mail, Instagram, Megaphone, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, X, RotateCcw, Calendar, User, Edit3, Edit, Save, Globe, Eye, Check, Loader2, UploadCloud, FileUp, Link2 } from 'lucide-react';
 import { ErpIntegrationPortal } from './ErpIntegrationPortal';
 import { EconAcademyBackendPortal } from './EconAcademyBackendPortal';
 import { InkCanvasBackendPortal } from './InkCanvasBackendPortal';
 import { AdDeskBackendPortal } from './AdDeskBackendPortal';
 import { StoryEditorPage } from './StoryEditorPage';
 import { ImageDatabaseBackendSection } from './ImageDatabaseBackendSection';
+import { HyperlinkModal } from './HyperlinkModal';
 
 interface StaffPortalSectionProps {
   isLoggedIn: boolean;
@@ -132,6 +133,45 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
   const [storyDeck, setStoryDeck] = useState('');
   const [storyCategory, setStoryCategory] = useState('ECONOMY');
   const [storyBody, setStoryBody] = useState('');
+  const staffBodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showStaffLinkModal, setShowStaffLinkModal] = useState(false);
+  const [staffLinkInitialText, setStaffLinkInitialText] = useState('');
+  const [staffLinkSelectionRange, setStaffLinkSelectionRange] = useState<{ start: number; end: number } | null>(null);
+
+  const handleOpenStaffLinkModal = () => {
+    const textarea = staffBodyTextareaRef.current;
+    let selected = '';
+    let start = 0;
+    let end = 0;
+    if (textarea) {
+      start = textarea.selectionStart;
+      end = textarea.selectionEnd;
+      selected = textarea.value.substring(start, end);
+    }
+    setStaffLinkInitialText(selected);
+    setStaffLinkSelectionRange({ start, end });
+    setShowStaffLinkModal(true);
+  };
+
+  const handleInsertStaffHyperlink = (displayText: string, url: string) => {
+    const markdownLink = `[${displayText}](${url})`;
+    if (staffBodyTextareaRef.current && staffLinkSelectionRange) {
+      const { start, end } = staffLinkSelectionRange;
+      const before = storyBody.substring(0, start);
+      const after = storyBody.substring(end);
+      const newBody = before + markdownLink + after;
+      setStoryBody(newBody);
+      setTimeout(() => {
+        if (staffBodyTextareaRef.current) {
+          staffBodyTextareaRef.current.focus();
+          const newCursor = start + markdownLink.length;
+          staffBodyTextareaRef.current.setSelectionRange(newCursor, newCursor);
+        }
+      }, 50);
+    } else {
+      setStoryBody((prev) => (prev ? prev + ' ' + markdownLink : markdownLink));
+    }
+  };
   const [storyImageUrl, setStoryImageUrl] = useState('');
   const [storyPlacement, setStoryPlacement] = useState<'standard' | 'notable' | 'spotlight' | 'lead'>('standard');
   const [isLeadStory, setIsLeadStory] = useState(false);
@@ -207,7 +247,7 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
     writersSet.add('Prof. Anura Senanayake');
     writersSet.add('Dr. Nalin Bandara');
     writersSet.add('Dilshan Perera');
-    writersSet.add('Ranul Seneviratne');
+    writersSet.add('Disnaka');
     writersSet.add('W.A. Wijewardena');
     writersSet.add('Kavindi Jayawardena');
     writersSet.add('LankaEcon Editorial Board');
@@ -2237,10 +2277,21 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
 
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                <label className="text-slate-800 font-extrabold text-sm flex items-center gap-1.5">
-                  <span>Full Article Body *</span>
-                  <span className="text-xs text-slate-400 font-normal">(Editorial Writing Area)</span>
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="text-slate-800 font-extrabold text-sm flex items-center gap-1.5">
+                    <span>Full Article Body *</span>
+                    <span className="text-xs text-slate-400 font-normal">(Editorial Writing Area)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleOpenStaffLinkModal}
+                    className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-900 font-extrabold border border-sky-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition text-xs ml-2"
+                    title="Highlight any word or phrase and click to attach a document link / hyperlink (Ctrl+K)"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Add Hyperlink / Document</span>
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 text-xs font-mono">
                   <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-xs border border-slate-300 font-bold">
                     {storyBody ? `${storyBody.trim().split(/\s+/).filter(Boolean).length} words` : '0 words'}
@@ -2257,13 +2308,26 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
               </div>
               <div className="relative">
                 <textarea
+                  ref={staffBodyTextareaRef}
                   required
                   rows={15}
                   value={storyBody}
                   onChange={(e) => setStoryBody(e.target.value)}
-                  placeholder="Write or paste full news text here... Use multiple paragraphs for clear journalistic structure."
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                      e.preventDefault();
+                      handleOpenStaffLinkModal();
+                    }
+                  }}
+                  placeholder="Write or paste full news text here... Highlight any word and click 'Add Hyperlink' to link an important document, PDF, or website."
                   className="w-full min-h-[360px] md:min-h-[460px] bg-slate-50 focus:bg-white border-2 border-slate-300 focus:border-[#0284C7] p-4 text-sm leading-relaxed text-slate-900 rounded-xs shadow-inner outline-none transition font-sans resize-y selection:bg-sky-200"
                 />
+                <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-100 px-3 py-1.5 border-x border-b border-slate-300 font-mono">
+                  <span className="flex items-center gap-1">
+                    <Link2 className="w-3 h-3 text-sky-600" />
+                    <span>💡 <strong>Hyperlink Tip:</strong> Highlight any word and press <strong>Ctrl+K</strong> or click <strong>"Add Hyperlink"</strong> above to link to a document or website.</span>
+                  </span>
+                </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 mt-1.5 text-xs text-slate-500">
                 <p className="flex items-center gap-1">
@@ -3855,6 +3919,14 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
           </div>
         </div>
       )}
+
+      {/* EDITORIAL HYPERLINK / DOCUMENT ATTACHMENT MODAL */}
+      <HyperlinkModal
+        isOpen={showStaffLinkModal}
+        onClose={() => setShowStaffLinkModal(false)}
+        initialText={staffLinkInitialText}
+        onInsert={handleInsertStaffHyperlink}
+      />
     </div>
   );
 };

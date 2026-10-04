@@ -80,7 +80,7 @@ export const EconAcademyBackendPortal: React.FC = () => {
   // Scholar Treatise Direct Upload Modal States
   const [showAddArticleModal, setShowAddArticleModal] = useState(false);
   const [aTitle, setATitle] = useState('');
-  const [aAuthorName, setAAuthorName] = useState('Prof. Ranul Seneviratne');
+  const [aAuthorName, setAAuthorName] = useState('Disnaka');
   const [aAuthorTitle, setAAuthorTitle] = useState('Senior Macroeconomics Fellow');
   const [aAuthorAffiliation, setAAuthorAffiliation] = useState('University of Colombo & CBSL Research Desk');
   const [aCategory, setACategory] = useState('Monetary Policy & Exchange Rates');
@@ -308,20 +308,57 @@ export const EconAcademyBackendPortal: React.FC = () => {
     setShowCoverModal(true);
   };
 
-  const handleCoverFileSelected = (file: File) => {
+  const compressCoverImage = (file: File, maxWidth = 800, maxHeight = 1200, quality = 0.85): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve('');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawUrl = e.target?.result as string;
+        if (!rawUrl) {
+          resolve('');
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(rawUrl);
+        img.src = rawUrl;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleCoverFileSelected = async (file: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       alert('Please select a valid image file (PNG, JPG, JPEG, WEBP, GIF, or SVG).');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        setNewCoverUrl(result);
-      }
-    };
-    reader.readAsDataURL(file);
+    const optimized = await compressCoverImage(file);
+    if (optimized) {
+      setNewCoverUrl(optimized);
+    }
   };
 
   const handleSaveBookCover = async () => {
@@ -337,7 +374,14 @@ export const EconAcademyBackendPortal: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ coverUrl: newCoverUrl }),
       });
-      const data = await res.json();
+      let data: any = {};
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(res.status === 413 ? 'Image is too large (exceeds web server limit).' : `Server returned status ${res.status}`);
+      }
       if (res.ok && data.success) {
         alert(`✓ Front cover / thumbnail image updated successfully for "${coverModalBook.title}"!\nThe change is saved in the backend database.`);
         setShowCoverModal(false);
@@ -613,7 +657,17 @@ export const EconAcademyBackendPortal: React.FC = () => {
           fullRawText: bWordContent,
         }),
       });
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (res.status === 413 || text.includes('413 Request Entity Too Large')) {
+          throw new Error('The uploaded cover image or text is too large for the web server limit (HTTP 413). Please increase Nginx client_max_body_size or optimize the image.');
+        }
+        throw new Error(`Server returned unexpected response (status ${res.status}): ${text.replace(/<[^>]+>/g, '').trim().slice(0, 150)}`);
+      }
       if (res.ok && data.success) {
         alert(editingBookId ? `✓ Book / Textbook Updated!\n"${bTitle}" (${calculatedCount} Pages) changes saved successfully.` : `🎉 Book / Textbook Published Live!\n"${bTitle}" (${calculatedCount} Pages) is now readable in book flipbook format!`);
         setShowAddBookModal(false);
@@ -2288,14 +2342,11 @@ export const EconAcademyBackendPortal: React.FC = () => {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (ev) => {
-                                if (ev.target?.result) setBCoverUrl(ev.target.result as string);
-                              };
-                              reader.readAsDataURL(file);
+                              const optimized = await compressCoverImage(file);
+                              if (optimized) setBCoverUrl(optimized);
                             }
                           }}
                         />

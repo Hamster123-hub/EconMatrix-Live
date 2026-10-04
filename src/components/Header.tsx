@@ -206,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => setActiveTab('contacts')}
                 className="hidden md:flex items-center gap-1.5 text-[10px] font-mono text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 px-2 py-0.5 rounded-xs border border-slate-700/80 transition cursor-pointer"
-                title="Direct Editorial Contact: Disnaka Seneviratne (0771774033)"
+                title="Direct Editorial Contact: Disnaka (0771774033)"
               >
                 <PhoneCall className="w-3 h-3 text-amber-400" />
                 <span>Direct: Disnaka (0771774033)</span>

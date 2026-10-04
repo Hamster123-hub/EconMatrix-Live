@@ -1,5 +1,5 @@
 import { ScholarWriter, EconMediaContent, EconBook, EconScholarArticle, EconCourse } from '../types';
-import { getRanulBookFullPages } from './ranulBookFullText';
+import { CLASSICAL_BOOKS_DATA } from './classicalBooksLibrary';
 
 export const INITIAL_SCHOLAR_WRITERS: ScholarWriter[] = [
   {
@@ -85,17 +85,20 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
   {
     id: 'book-ranul-001',
     title: "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE",
-    author: '',
+    author: 'Disnaka',
     publishedYear: '2025',
     category: 'Central Banking & Monetary Policy',
     coverUrl: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80',
-    downloadUrl: 'https://www.cbsl.gov.lk',
-    readOnlineUrl: 'https://www.cbsl.gov.lk',
-    description: 'A Nation Held at Ransom by Its Own Central Bank. The full 207-page treatise analyzing central bank plumbing, Open Market Operations, the Impossible Trinity, Balance of Payments, and Sri Lanka\'s transition to the single Overnight Policy Rate (OPR).',
-    pagesCount: 207,
-    fileFormat: 'PDF',
+    downloadUrl: '',
+    readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+    flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+    description: 'A Nation Held at Ransom by Its Own Central Bank. The comprehensive 191-page treatise analyzing central bank plumbing, Open Market Operations, the Impossible Trinity, Balance of Payments, and Sri Lanka\'s transition to the single Overnight Policy Rate (OPR).',
+    pagesCount: 191,
+    fileFormat: '3D FlipHTML5',
     isFeatured: true,
-    pages: getRanulBookFullPages(),
+    priceLKR: 3500,
+    isPaidBook: true,
+    allowDownload: false,
   },
   {
     id: 'book-class-001',
@@ -110,6 +113,7 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
     pagesCount: 950,
     fileFormat: 'PDF',
     isFeatured: true,
+    pages: CLASSICAL_BOOKS_DATA['book-class-001']?.samplePages,
   },
   {
     id: 'book-class-002',
@@ -124,6 +128,7 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
     pagesCount: 320,
     fileFormat: 'PDF',
     isFeatured: true,
+    pages: CLASSICAL_BOOKS_DATA['book-class-002']?.samplePages,
   },
   {
     id: 'book-class-003',
@@ -138,6 +143,7 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
     pagesCount: 430,
     fileFormat: 'PDF',
     isFeatured: true,
+    pages: CLASSICAL_BOOKS_DATA['book-class-003']?.samplePages,
   },
   {
     id: 'book-class-004',
@@ -152,6 +158,7 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
     pagesCount: 350,
     fileFormat: 'PDF',
     isFeatured: true,
+    pages: CLASSICAL_BOOKS_DATA['book-class-004']?.samplePages,
   },
   {
     id: 'book-class-005',
@@ -166,6 +173,7 @@ export const INITIAL_ECON_BOOKS: EconBook[] = [
     pagesCount: 520,
     fileFormat: 'PDF',
     isFeatured: true,
+    pages: CLASSICAL_BOOKS_DATA['book-class-005']?.samplePages,
   },
   {
     id: 'book-001',

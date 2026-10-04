@@ -19,6 +19,7 @@ import {
   Printer
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
+import { renderArticleParagraph } from '../utils/articleRenderer';
 
 interface FullArticleViewProps {
   article: Article;
@@ -596,7 +597,7 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
         }`}>
           {paragraphs.map((para, idx) => (
             <p key={idx} className="leading-relaxed">
-              {para}
+              {renderArticleParagraph(para, isNightReader)}
             </p>
           ))}
         </div>

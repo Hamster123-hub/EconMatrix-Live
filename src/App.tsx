@@ -318,7 +318,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-5 sm:px-10 md:px-14 lg:px-20 xl:px-24 py-6 flex-1 w-full space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 md:px-10 lg:px-12 xl:px-16 py-6 flex-1 w-full space-y-8">
         
         {/* RENDER FULL ARTICLE VIEW SMOOTHLY ON WHITE BACKGROUND WHEN SELECTED */}
         {selectedArticle ? (
@@ -918,6 +918,7 @@ export default function App() {
         onSelectTab={(tab) => {
           setActiveTab(tab);
           setSelectedArticle(null);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenSubscriberPreferences={openSubscriberPreferences}
         language={language}

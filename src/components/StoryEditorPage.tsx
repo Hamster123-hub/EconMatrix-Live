@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Article, EmployeeRecord, MediaAsset } from '../types';
 import {
   ArrowLeft,
@@ -25,9 +25,11 @@ import {
   Monitor,
   ExternalLink,
   RotateCcw,
-  UploadCloud
+  UploadCloud,
+  Link2
 } from 'lucide-react';
 import { FormattedText } from './FormattedText';
+import { HyperlinkModal } from './HyperlinkModal';
 
 interface StoryEditorPageProps {
   article: any;
@@ -155,6 +157,47 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
   // Word count & calculated reading time helper
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
   const suggestedReadingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+  // Textarea ref & Hyperlink insertion modal state
+  const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkInitialText, setLinkInitialText] = useState('');
+  const [linkSelectionRange, setLinkSelectionRange] = useState<{ start: number; end: number } | null>(null);
+
+  const handleOpenLinkModal = () => {
+    const textarea = bodyTextareaRef.current;
+    let selected = '';
+    let start = 0;
+    let end = 0;
+    if (textarea) {
+      start = textarea.selectionStart;
+      end = textarea.selectionEnd;
+      selected = textarea.value.substring(start, end);
+    }
+    setLinkInitialText(selected);
+    setLinkSelectionRange({ start, end });
+    setShowLinkModal(true);
+  };
+
+  const handleInsertHyperlink = (displayText: string, url: string) => {
+    const markdownLink = `[${displayText}](${url})`;
+    if (bodyTextareaRef.current && linkSelectionRange) {
+      const { start, end } = linkSelectionRange;
+      const before = body.substring(0, start);
+      const after = body.substring(end);
+      const newBody = before + markdownLink + after;
+      setBody(newBody);
+      setTimeout(() => {
+        if (bodyTextareaRef.current) {
+          bodyTextareaRef.current.focus();
+          const newCursor = start + markdownLink.length;
+          bodyTextareaRef.current.setSelectionRange(newCursor, newCursor);
+        }
+      }, 50);
+    } else {
+      setBody((prev) => (prev ? prev + ' ' + markdownLink : markdownLink));
+    }
+  };
 
   const handleInsertText = (prefix: string, suffix: string = '') => {
     setBody((prev) => prev + `\n\n${prefix}${suffix}`);
@@ -411,6 +454,15 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                   <div className="flex flex-wrap items-center gap-1.5 text-xs">
                     <button
                       type="button"
+                      onClick={handleOpenLinkModal}
+                      className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-900 font-extrabold border border-sky-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition"
+                      title="Highlight any word and click to attach a document link / hyperlink (Ctrl+K)"
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Add Hyperlink / Document</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleInsertText('### Section Sub-Heading')}
                       className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-xs flex items-center gap-1 cursor-pointer"
                       title="Insert Subheading"
@@ -439,14 +491,29 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                   </div>
                 </div>
 
-                <textarea
-                  rows={18}
-                  required
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Draft or edit the complete story analysis here. Use markdown formatting, separate paragraphs with double enters."
-                  className="w-full text-sm font-serif leading-relaxed text-slate-900 border border-slate-300 p-4 focus:border-[#0284C7] focus:bg-sky-50/10 outline-none transition"
-                />
+                <div className="relative">
+                  <textarea
+                    ref={bodyTextareaRef}
+                    rows={18}
+                    required
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                        e.preventDefault();
+                        handleOpenLinkModal();
+                      }
+                    }}
+                    placeholder="Draft or edit the complete story analysis here. Highlight any word and click 'Add Hyperlink' to link an important document, PDF, or website."
+                    className="w-full text-sm font-serif leading-relaxed text-slate-900 border border-slate-300 p-4 focus:border-[#0284C7] focus:bg-sky-50/10 outline-none transition selection:bg-sky-200"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-3 py-1.5 border-x border-b border-slate-200 font-mono">
+                    <span className="flex items-center gap-1">
+                      <Link2 className="w-3 h-3 text-sky-600" />
+                      <span>💡 <strong>Hyperlink Tip:</strong> Highlight any word/phrase & press <strong>Ctrl+K</strong> or click <strong>"Add Hyperlink"</strong> to link a PDF report or URL.</span>
+                    </span>
+                  </div>
+                </div>
 
                 {/* Article Statistics Counter Bar */}
                 <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 pt-2 border-t border-slate-100 font-mono">
@@ -644,7 +711,7 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                     type="text"
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
-                    placeholder="e.g. Ranul Seneviratne"
+                    placeholder="e.g. Disnaka"
                     className="w-full bg-slate-50 border border-slate-300 p-2 text-xs font-medium text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none"
                   />
                 </div>
@@ -1088,6 +1155,14 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* HYPERLINK / DOCUMENT LINK MODAL */}
+      <HyperlinkModal
+        isOpen={showLinkModal}
+        onClose={() => setShowLinkModal(false)}
+        initialText={linkInitialText}
+        onInsert={handleInsertHyperlink}
+      />
     </div>
   );
 };

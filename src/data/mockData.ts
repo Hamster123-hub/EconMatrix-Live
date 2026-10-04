@@ -47,10 +47,10 @@ export const INITIAL_AUTHORS: Author[] = [
   },
   {
     author_id: 4,
-    first_name: 'Ranul',
-    last_name: 'Seneviratne',
-    slug: 'ranul-seneviratne',
-    email: 'ranul@lankaecon.com',
+    first_name: 'Disnaka',
+    last_name: '',
+    slug: 'disnaka',
+    email: 'disnaka@lankaecon.com',
     bio: 'Founder & Lead Monetary Analyst at Econ Matrix / LankaEcon.',
     profile_image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     is_active: true,
@@ -504,8 +504,8 @@ If the government bans imported cars, consumers do not save those rupees. Instea
     image_caption: 'Container port operations in Colombo Harbor.',
     reading_time_minutes: 7,
     view_count: 1890,
-    meta_title: 'Why Import Bans Fail | Ranul Seneviratne',
-    meta_description: 'Ranul Seneviratne breaks down the Savings-Investment Identity and trade deficit causes.',
+    meta_title: 'Why Import Bans Fail | Disnaka',
+    meta_description: 'Disnaka breaks down the Savings-Investment Identity and trade deficit causes.',
     published_at: new Date(Date.now() - 3600000 * 4).toISOString(),
     created_at: new Date(Date.now() - 3600000 * 7).toISOString(),
     authors: [INITIAL_AUTHORS[0]],
@@ -517,7 +517,7 @@ If the government bans imported cars, consumers do not save those rupees. Instea
     title: 'Reforming the Central Bank of Sri Lanka: From Discretionary Injections to Currency Board Rules',
     slug: 'reforming-central-banking-sri-lanka-currency-board-rules',
     deck: 'David Ricardo’s 1816 Ingot Plan and John Exter’s 1949 warnings offer an imperative blueprint for anchoring long-term monetary stability.',
-    body: `COLOMBO (LankaEcon Special Dispatch) — By Ranul Seneviratne
+    body: `COLOMBO (LankaEcon Special Dispatch) — By Disnaka
 
 Sri Lanka's history since the establishment of the Monetary Law Act of 1949 has been marked by periodic balance-of-payments crises, severe inflation spikes, and currency devaluations. The core cause has always been discretionary central banking—the ability of monetary authorities to create money at will to monetize government debt or rescue over-extended banks.
 
@@ -537,8 +537,8 @@ Under such a framework, inflation drops to world levels, exchange rate volatilit
     image_caption: 'Colombo financial district and central banking institutions.',
     reading_time_minutes: 6,
     view_count: 1750,
-    meta_title: 'Reforming Sri Lanka Central Banking | Ranul Seneviratne',
-    meta_description: 'Ranul Seneviratne outlines Ricardo Ingot Plan and Currency Board principles.',
+    meta_title: 'Reforming Sri Lanka Central Banking | Disnaka',
+    meta_description: 'Disnaka outlines Ricardo Ingot Plan and Currency Board principles.',
     published_at: new Date(Date.now() - 3600000 * 6).toISOString(),
     created_at: new Date(Date.now() - 3600000 * 9).toISOString(),
     authors: [INITIAL_AUTHORS[0]],
@@ -550,7 +550,7 @@ Under such a framework, inflation drops to world levels, exchange rate volatilit
     title: 'The Three Master Visions of Money: Classical, Marxist, and Keynesian Lessons for Modern Sri Lanka',
     slug: 'three-master-visions-money-classical-marxist-keynesian-sri-lanka',
     deck: 'Synthesizing David Hume, Karl Marx, and John Maynard Keynes clarifies why money printing cannot substitute for real national economic productivity.',
-    body: `COLOMBO (LankaEcon Special Dispatch) — By Ranul Seneviratne
+    body: `COLOMBO (LankaEcon Special Dispatch) — By Disnaka
 
 Economic history offers three distinct paradigms regarding the nature and role of money in human society:
 
@@ -570,8 +570,8 @@ Understanding modern macroeconomics requires recognizing that Keynesian sticky-p
     image_caption: 'Historical library archive of economic literature.',
     reading_time_minutes: 8,
     view_count: 2310,
-    meta_title: 'Three Visions of Money | Ranul Seneviratne',
-    meta_description: 'Ranul Seneviratne synthesizes Classical, Marxist, and Keynesian monetary theories.',
+    meta_title: 'Three Visions of Money | Disnaka',
+    meta_description: 'Disnaka synthesizes Classical, Marxist, and Keynesian monetary theories.',
     published_at: new Date(Date.now() - 3600000 * 8).toISOString(),
     created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
     authors: [INITIAL_AUTHORS[0]],
@@ -583,7 +583,7 @@ Understanding modern macroeconomics requires recognizing that Keynesian sticky-p
     title: 'Overtrading Without Deposits: How Interbank Liquidity Windows Distort Commercial Banking in Sri Lanka',
     slug: 'overtrading-without-deposits-interbank-injections-sri-lanka',
     deck: 'When commercial banks rely on cheap central bank liquidity facilities instead of attracting sticky customer deposits, credit expansion outpaces real savings.',
-    body: `COLOMBO (LankaEcon Special Dispatch) — By Ranul Seneviratne
+    body: `COLOMBO (LankaEcon Special Dispatch) — By Disnaka
 
 A healthy banking sector relies on sticky customer savings deposits—from household thrift and corporate earnings—to fund long-term loan portfolios. However, when central banks offer cheap overnight standing lending windows, commercial banks fall into the habit of "overtrading."
 
@@ -603,8 +603,8 @@ Prudential regulation must enforce strict penalties on standing facility usage, 
     image_caption: 'Commercial bank treasury desk in Colombo.',
     reading_time_minutes: 5,
     view_count: 1980,
-    meta_title: 'Overtrading Without Deposits | Ranul Seneviratne',
-    meta_description: 'Ranul Seneviratne examines commercial banking operations and interbank liquidity.',
+    meta_title: 'Overtrading Without Deposits | Disnaka',
+    meta_description: 'Disnaka examines commercial banking operations and interbank liquidity.',
     published_at: new Date(Date.now() - 3600000 * 10).toISOString(),
     created_at: new Date(Date.now() - 3600000 * 14).toISOString(),
     authors: [INITIAL_AUTHORS[0]],
@@ -890,7 +890,7 @@ This policy analysis breaks down the price protection mechanism intended to safe
     view_count: 1420,
     published_at: '2025-11-18T09:30:00Z',
     created_at: '2025-11-18T08:00:00Z',
-    authors: [INITIAL_AUTHORS[4]], // Ranul Seneviratne
+    authors: [INITIAL_AUTHORS[4]], // Disnaka
     is_subscription_only: false,
   },
   {
@@ -1014,7 +1014,7 @@ This policy analysis breaks down the price protection mechanism intended to safe
     title: 'Why Classical Currency Boards Eliminate Balance of Payments Crises: An Analysis of the 1884 Currency Ordinance',
     slug: 'why-classical-currency-boards-eliminate-bop-crises',
     deck: 'Examining the automatic reserve backing mechanism that kept Ceylon’s rupee stable for seven decades before 1950.',
-    body: `COLOMBO (Econ Matrix Dispatch) — Ranul Seneviratne analyzes the operational framework of the Commissioners of Currency under the 1884 Paper Currency Ordinance. Under a currency board, every rupee issued is backed 100% by foreign exchange, making discretionary central bank money printing mathematically impossible.`,
+    body: `COLOMBO (Econ Matrix Dispatch) — Disnaka analyzes the operational framework of the Commissioners of Currency under the 1884 Paper Currency Ordinance. Under a currency board, every rupee issued is backed 100% by foreign exchange, making discretionary central bank money printing mathematically impossible.`,
     primary_category: 'ECONOMY',
     status: 'published',
     is_breaking: false,
@@ -1025,7 +1025,7 @@ This policy analysis breaks down the price protection mechanism intended to safe
     view_count: 4150,
     published_at: '2024-09-14T08:30:00Z',
     created_at: '2024-09-14T06:00:00Z',
-    authors: [INITIAL_AUTHORS[4]], // Ranul Seneviratne
+    authors: [INITIAL_AUTHORS[4]], // Disnaka
     is_subscription_only: false,
   },
   {
@@ -1130,7 +1130,7 @@ This policy analysis breaks down the price protection mechanism intended to safe
     title: 'Understanding John Exter’s Warning: The Mechanics of Open Market Injections and Dollar Outflows',
     slug: 'understanding-john-exter-warning-mechanics-injections',
     deck: 'How the founder of the Central Bank of Sri Lanka warned in 1949 that discretionary central banking would trigger chronic currency instability.',
-    body: `COLOMBO (Econ Matrix Foundation Series) — Ranul Seneviratne re-examines the 1949 Exter Report (Sessional Paper XIV). John Exter explicitly documented that unlike a currency board, an open-market operating central bank can create unbacked credit that guarantees exchange depreciation unless strictly constrained.`,
+    body: `COLOMBO (Econ Matrix Foundation Series) — Disnaka re-examines the 1949 Exter Report (Sessional Paper XIV). John Exter explicitly documented that unlike a currency board, an open-market operating central bank can create unbacked credit that guarantees exchange depreciation unless strictly constrained.`,
     primary_category: 'ECONOMY',
     status: 'published',
     is_breaking: false,
@@ -1141,7 +1141,7 @@ This policy analysis breaks down the price protection mechanism intended to safe
     view_count: 5200,
     published_at: '2023-05-12T08:00:00Z',
     created_at: '2023-05-12T05:30:00Z',
-    authors: [INITIAL_AUTHORS[4]], // Ranul Seneviratne
+    authors: [INITIAL_AUTHORS[4]], // Disnaka
     is_subscription_only: false,
   },
   {

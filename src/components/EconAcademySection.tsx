@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ScholarWriter, EconMediaContent, EconBook, EconScholarArticle, EconCourse } from '../types';
-import { BookOpen, Video, FileText, Award, Download, Play, Users, Search, Plus, Sparkles, Send, Sliders, ChevronDown, ChevronUp, History, Printer, Copy, Check, X, Share2, ExternalLink, Bookmark, ArrowLeft } from 'lucide-react';
+import { BookOpen, Video, FileText, Award, Download, Play, Users, Search, Plus, Sparkles, Send, Sliders, ChevronDown, ChevronUp, History, Printer, Copy, Check, X, Share2, ExternalLink, Bookmark, ArrowLeft, Lock, ShieldCheck, KeyRound } from 'lucide-react';
 import { PublisherSubmissionModal } from './PublisherSubmissionModal';
 import { BookDetailModal } from './BookDetailModal';
+import { BookCheckoutModal } from './BookCheckoutModal';
+import { isBookPurchased, getBookPurchase } from '../utils/bookAccess';
 import { AdamSmithMonetarySection } from './AdamSmithMonetarySection';
 import { EconomicThoughtSection } from './EconomicThoughtSection';
 import { InteractiveBookReader } from './InteractiveBookReader';
@@ -41,6 +43,9 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
   const [selectedBook, setSelectedBook] = useState<EconBook | null>(null);
   const [selectedBookForDetails, setSelectedBookForDetails] = useState<EconBook | null>(null);
   const [showBookDetailModal, setShowBookDetailModal] = useState(false);
+  const [showBookCheckoutModal, setShowBookCheckoutModal] = useState(false);
+  const [checkoutInitialTab, setCheckoutInitialTab] = useState<'checkout' | 'restore'>('checkout');
+  const [bookUnlockCount, setBookUnlockCount] = useState(0);
   const [selectedFaculty, setSelectedFaculty] = useState<ScholarWriter | null>(null);
 
   // Publisher Submission Modal State
@@ -50,8 +55,14 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
   useEffect(() => {
     const sanitizeBookAuthor = (b: EconBook): EconBook => {
       const isTragic = b.id === 'book-ranul-001' || b.title?.toLowerCase().includes('tragic mis-fortune') || b.title?.toLowerCase().includes('story behind');
-      if (isTragic || (b.author && b.author.toLowerCase().includes('ranul'))) {
-        return { ...b, author: '' };
+      if (isTragic) {
+        return { 
+          ...b, 
+          author: 'Disnaka',
+          flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+          readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+          fileFormat: '3D FlipHTML5'
+        };
       }
       return b;
     };
@@ -1110,6 +1121,8 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
       {subTab === 'books' && (() => {
         const featuredBook = books.find((b) => b.id === 'book-ranul-001' || b.title.toLowerCase().includes('story behind sri lanka')) || books[0];
         const otherBooks = books.filter((b) => b?.id !== featuredBook?.id);
+        const isTragicUnlocked = isBookPurchased('book-ranul-001') || isBookPurchased(featuredBook?.id || '');
+        const purchaseData = getBookPurchase('book-ranul-001') || getBookPurchase(featuredBook?.id || '');
 
         return (
           <div className="space-y-8">
@@ -1124,15 +1137,25 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
                   <div className="flex items-center gap-2">
                     <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-mono font-black text-xs uppercase tracking-wider px-3.5 py-1 rounded-full shadow-md flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-slate-950 fill-slate-950" />
-                      <span>FEATURED AUTHORITATIVE MONETARY TREATISE</span>
+                      <span>FEATURED MONETARY TREATISE</span>
                     </span>
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full">
-                      191 Pages Complete • 2026 Edition
+                      191 Pages • 18 Chapters • 3D FlipHTML5
                     </span>
                   </div>
 
-                  <div className="text-amber-400 font-mono text-xs font-bold flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">
-                    <span>Digital License: LKR 2,500 (~$12.50 USD)</span>
+                  <div className="flex items-center gap-2">
+                    {isTragicUnlocked ? (
+                      <div className="text-emerald-400 font-mono text-xs font-bold flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-500/50 px-3.5 py-1 rounded-full shadow-sm">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span>License Verified • {purchaseData?.customerName || 'Full Access'}</span>
+                      </div>
+                    ) : (
+                      <div className="text-amber-300 font-mono text-xs font-bold flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/40 px-3.5 py-1 rounded-full shadow-sm">
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Paid Monograph: <strong className="text-white">Rs. 3,500 LKR</strong></span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1151,10 +1174,10 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
                         alt={featuredBook.title}
                         className="w-52 h-72 sm:w-60 sm:h-84 object-cover rounded-xl shadow-2xl border-2 border-amber-500/50 group-hover:scale-105 transition duration-300"
                       />
-                      <div className="absolute inset-0 bg-slate-950/40 rounded-xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <div className="absolute inset-0 bg-slate-950/50 rounded-xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-4 text-center">
                         <span className="bg-amber-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg shadow-lg flex items-center gap-1.5">
                           <BookOpen className="w-4 h-4" />
-                          <span>View Description & Chapter 1 Preview</span>
+                          <span>Inspect Contents & Chapter Outlines (Free)</span>
                         </span>
                       </div>
                     </div>
@@ -1175,7 +1198,7 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
                       <p className="text-sm text-slate-300 font-mono">
                         {featuredBook.author && !featuredBook.author.toLowerCase().includes('ranul') ? (
                           <>Author: <strong className="text-white font-serif">{featuredBook.author}</strong> | </>
-                        ) : null}Revised Edition: <strong className="text-amber-400">{featuredBook.publishedYear}</strong>
+                        ) : null}Published / Edition: <strong className="text-amber-400">{featuredBook.publishedYear}</strong>
                       </p>
                     </div>
 
@@ -1199,128 +1222,103 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
                       </div>
                       <div className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-lg text-center">
                         <span className="text-slate-400 text-[10px] uppercase block">Access</span>
-                        <strong className="text-emerald-400 font-bold">Online Reader</strong>
+                        <strong className={isTragicUnlocked ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+                          {isTragicUnlocked ? "Unlocked (Active)" : "Rs. 3,500 (Free Outline)"}
+                        </strong>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3 pt-3">
-                      <button
-                        onClick={() => {
-                          setSelectedBookForDetails(featuredBook);
-                          setShowBookDetailModal(true);
-                        }}
-                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm px-5 py-3 rounded-lg shadow-xl transition cursor-pointer flex items-center gap-2"
-                      >
-                        <BookOpen className="w-4 h-4 text-slate-950" />
-                        <span>View Description & Read Free Chapter 1</span>
-                      </button>
+                    <div className="flex flex-wrap items-center gap-3 pt-3">
+                      {isTragicUnlocked ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              const bookWithFlip = {
+                                ...featuredBook,
+                                flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                priceLKR: 3500,
+                                isPaidBook: true,
+                                allowDownload: false,
+                              };
+                              setSelectedBook(bookWithFlip);
+                            }}
+                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm px-6 py-3 rounded-lg shadow-xl transition cursor-pointer flex items-center gap-2"
+                          >
+                            <BookOpen className="w-4 h-4 text-slate-950" />
+                            <span>Read 3D Interactive Flipbook (Unlocked)</span>
+                          </button>
 
-                      <button
-                        onClick={() => {
-                          setSelectedBookForDetails(featuredBook);
-                          setShowBookDetailModal(true);
-                        }}
-                        className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-lg border border-amber-400/40 shadow-xl transition cursor-pointer flex items-center gap-2"
-                      >
-                        <Award className="w-4 h-4 text-amber-300" />
-                        <span>Purchase & Read Online (LKR 2,500)</span>
-                      </button>
+                          <button
+                            onClick={() => {
+                              const bookWithFlip = {
+                                ...featuredBook,
+                                flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                priceLKR: 3500,
+                                isPaidBook: true,
+                                allowDownload: false,
+                              };
+                              setSelectedBookForDetails(bookWithFlip);
+                              setShowBookDetailModal(true);
+                            }}
+                            className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs sm:text-sm px-4 py-3 rounded-lg transition cursor-pointer flex items-center gap-2"
+                          >
+                            <FileText className="w-4 h-4 text-amber-400" />
+                            <span>View Contents & Topics</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setCheckoutInitialTab('checkout');
+                              setShowBookCheckoutModal(true);
+                            }}
+                            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm px-6 py-3 rounded-lg shadow-xl transition cursor-pointer flex items-center gap-2"
+                          >
+                            <Lock className="w-4 h-4 text-slate-950" />
+                            <span>Unlock Full Book (Rs. 3,500 LKR)</span>
+                          </button>
 
-                      <button
-                        onClick={() => {
-                          const flipUrl = featuredBook.flipHtml5Url || (featuredBook.readOnlineUrl?.includes('fliphtml5.com') ? featuredBook.readOnlineUrl : 'https://online.fliphtml5.com/EconMatrix/kbcg/');
-                          const newWin = window.open('', '_blank');
-                          if (newWin) {
-                            const sanitizedTitle = (featuredBook.title || 'Economics Book').replace(/"/g, '&quot;');
-                            const sanitizedAuthor = (featuredBook.author ? ` • ${featuredBook.author}` : '').replace(/"/g, '&quot;');
-                            const sanitizedDesc = (featuredBook.description || '').slice(0, 140).replace(/"/g, '&quot;');
-                            newWin.document.write(`
-                              <!DOCTYPE html>
-                              <html lang="en">
-                                <head>
-                                  <meta charset="utf-8">
-                                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                  <title>${sanitizedTitle} - Flipbook</title>
-                                  <script src="https://cdn.tailwindcss.com"></script>
-                                  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-                                  <style>
-                                    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0B1320; color: #F8FAFC; margin: 0; padding: 0; }
-                                    .font-serif { font-family: 'Merriweather', serif; }
-                                    .font-mono { font-family: 'JetBrains Mono', monospace; }
-                                  </style>
-                                </head>
-                                <body class="min-h-screen flex flex-col bg-[#0B1320] text-slate-100">
-                                  <nav class="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-3 flex items-center justify-between shadow-xl">
-                                    <div class="flex items-center gap-3">
-                                      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black shadow-md font-mono text-base">
-                                        EM
-                                      </div>
-                                      <div>
-                                        <span class="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block">ECON MATRIX • MONETARY RESEARCH</span>
-                                        <h1 class="font-serif font-bold text-sm sm:text-base text-white tracking-tight leading-none">${sanitizedTitle}</h1>
-                                      </div>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                      <button onclick="document.getElementById('flipbook-frame-container').requestFullscreen ? document.getElementById('flipbook-frame-container').requestFullscreen() : null" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3.5 py-1.5 rounded text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer">
-                                        <span>Fullscreen Mode</span>
-                                      </button>
-                                      <button onclick="window.close()" class="bg-rose-950 hover:bg-rose-900 text-rose-200 border border-rose-800 px-3 py-1.5 rounded text-xs font-mono font-bold transition cursor-pointer">
-                                        Close
-                                      </button>
-                                    </div>
-                                  </nav>
+                          <button
+                            onClick={() => {
+                              const bookWithFlip = {
+                                ...featuredBook,
+                                flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+                                priceLKR: 3500,
+                                isPaidBook: true,
+                                allowDownload: false,
+                              };
+                              setSelectedBookForDetails(bookWithFlip);
+                              setShowBookDetailModal(true);
+                            }}
+                            className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs sm:text-sm px-4 py-3 rounded-lg transition cursor-pointer flex items-center gap-2"
+                          >
+                            <FileText className="w-4 h-4 text-amber-400" />
+                            <span>Read Contents Pages (Free)</span>
+                          </button>
 
-                                  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col items-center justify-center">
-                                    <section class="text-center max-w-4xl mx-auto space-y-3 mb-8">
-                                      <div class="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-extrabold uppercase px-3.5 py-1 rounded-full shadow-xs">
-                                        <span>📖 3D DIGITAL FLIPBOOK</span>
-                                        <span>•</span>
-                                        <span>${featuredBook.category || 'CENTRAL BANK MONETARY POLICY'}</span>
-                                      </div>
-                                      <h1 class="font-serif text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-                                        ${sanitizedTitle}
-                                      </h1>
-                                      ${sanitizedDesc ? `<p class="font-serif text-base sm:text-xl text-amber-200/90 font-bold italic">"${sanitizedDesc}"</p>` : ''}
-                                      <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-400 pt-2 border-t border-slate-800/80 max-w-xl mx-auto">
-                                        <span>Author: <strong class="text-white">${sanitizedAuthor}</strong></span>
-                                        <span>•</span>
-                                        <span>Volume: <strong class="text-white">${featuredBook.pagesCount || 191} Pages</strong></span>
-                                        <span>•</span>
-                                        <span>Edition: <strong class="text-white">${featuredBook.publishedYear || '2026'}</strong></span>
-                                      </div>
-                                    </section>
+                          <button
+                            onClick={() => {
+                              setCheckoutInitialTab('restore');
+                              setShowBookCheckoutModal(true);
+                            }}
+                            className="bg-slate-900 hover:bg-slate-800 text-sky-300 border border-sky-600/40 font-bold text-xs sm:text-sm px-4 py-3 rounded-lg transition cursor-pointer flex items-center gap-2"
+                          >
+                            <KeyRound className="w-4 h-4 text-sky-400" />
+                            <span>Already Paid? Restore</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
 
-                                    <div id="flipbook-frame-container" class="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-4 shadow-2xl space-y-3">
-                                      <div class="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-lg flex items-center justify-between text-xs font-mono">
-                                        <div class="flex items-center gap-2 text-slate-300">
-                                          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                          <span class="font-bold text-amber-400">Interactive 3D FlipHTML5 Reader</span>
-                                        </div>
-                                        <span class="text-slate-400 hidden sm:inline">Use corner drag, arrow keys or pinch to flip pages</span>
-                                      </div>
-
-                                      <div style="position:relative;padding-top:max(60%,324px);width:100%;height:0;">
-                                        <iframe style="position:absolute;border:none;width:100%;height:100%;left:0;top:0;" src="${flipUrl}" title="${sanitizedTitle}" seamless="seamless" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true"></iframe>
-                                      </div>
-                                    </div>
-                                  </main>
-
-                                  <footer class="bg-[#0F172A] border-t border-slate-800 py-4 text-center text-xs font-mono text-slate-400">
-                                    <p>Econ Matrix Research Publication • All Rights Reserved © ${featuredBook.publishedYear || '2026'}${sanitizedAuthor}</p>
-                                  </footer>
-                                </body>
-                              </html>
-                            `);
-                            newWin.document.close();
-                          }
-                        }}
-                        className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-600 text-xs font-bold px-4 py-3 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-                        title="Open Standalone Window Reader"
-                      >
-                        <span>Standalone Window</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
+                    {/* Strict DRM Protection Badge */}
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400 pt-1 select-none">
+                      <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Online In-Browser Access Only • Local file downloading to laptop or mobile phone is strictly disabled to safeguard author copyright.</span>
                     </div>
                   </div>
                 </div>
@@ -1423,6 +1421,77 @@ export const EconAcademySection: React.FC<EconAcademySectionProps> = ({ language
         }}
         language={language}
       />
+
+      {/* Instant Payment & Checkout Modal */}
+      {showBookCheckoutModal && (
+        <BookCheckoutModal
+          isOpen={showBookCheckoutModal}
+          onClose={() => setShowBookCheckoutModal(false)}
+          book={
+            books.find((b) => b.id === 'book-ranul-001') || {
+              id: 'book-ranul-001',
+              title: "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE",
+              author: 'Disnaka',
+              publishedYear: '2025',
+              category: 'Central Banking & Monetary Policy',
+              coverUrl: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80',
+              downloadUrl: '',
+              readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              description: "A Nation Held at Ransom by Its Own Central Bank. The comprehensive 191-page treatise analyzing central bank plumbing, Open Market Operations, the Impossible Trinity, Balance of Payments, and Sri Lanka's transition to the single Overnight Policy Rate (OPR).",
+              pagesCount: 191,
+              fileFormat: '3D FlipHTML5',
+              priceLKR: 3500,
+              isPaidBook: true,
+              allowDownload: false,
+            }
+          }
+          onSuccess={(purchase) => {
+            setShowBookCheckoutModal(false);
+            setBookUnlockCount((prev) => prev + 1);
+            // Launch the 3D Flipbook directly
+            setSelectedBook({
+              id: 'book-ranul-001',
+              title: "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE",
+              author: 'Disnaka',
+              publishedYear: '2025',
+              category: 'Central Banking & Monetary Policy',
+              coverUrl: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80',
+              downloadUrl: '',
+              readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              description: "A Nation Held at Ransom by Its Own Central Bank. The comprehensive 191-page treatise analyzing central bank plumbing, Open Market Operations, the Impossible Trinity, Balance of Payments, and Sri Lanka's transition to the single Overnight Policy Rate (OPR).",
+              pagesCount: 191,
+              fileFormat: '3D FlipHTML5',
+              priceLKR: 3500,
+              isPaidBook: true,
+              allowDownload: false,
+            });
+          }}
+          onViewTableOfContents={() => {
+            setShowBookCheckoutModal(false);
+            const targetBook = books.find((b) => b.id === 'book-ranul-001') || {
+              id: 'book-ranul-001',
+              title: "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE",
+              author: 'Disnaka',
+              publishedYear: '2025',
+              category: 'Central Banking & Monetary Policy',
+              coverUrl: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80',
+              downloadUrl: '',
+              readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+              description: "A Nation Held at Ransom by Its Own Central Bank. The comprehensive 191-page treatise analyzing central bank plumbing, Open Market Operations, the Impossible Trinity, Balance of Payments, and Sri Lanka's transition to the single Overnight Policy Rate (OPR).",
+              pagesCount: 191,
+              fileFormat: '3D FlipHTML5',
+              priceLKR: 3500,
+              isPaidBook: true,
+              allowDownload: false,
+            };
+            setSelectedBookForDetails(targetBook);
+            setShowBookDetailModal(true);
+          }}
+        />
+      )}
     </div>
   );
 };

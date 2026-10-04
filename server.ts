@@ -175,9 +175,11 @@ let bookPurchasesStore: {
   bookTitle: string;
   customerName: string;
   customerEmail: string;
+  customerPhone?: string;
   amountLKR: number;
   paymentMethod: string;
   accessCode: string;
+  invoiceNumber?: string;
   purchasedAt: string;
   status: 'PAID_CONFIRMED' | 'PENDING';
 }[] = [];
@@ -813,6 +815,16 @@ async function startServer() {
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString(), security: 'active' });
+  });
+
+  // Project update package download
+  app.get('/api/download-update', (req, res) => {
+    const zipPath = path.join(process.cwd(), 'econmatrix-latest-update.zip');
+    if (fs.existsSync(zipPath)) {
+      res.download(zipPath, 'econmatrix-latest-update.zip');
+    } else {
+      res.status(404).send('Update package not found');
+    }
   });
 
   // EMPLOYEE AUTH & AUTHORIZATION SYSTEM APIs
@@ -2107,7 +2119,7 @@ Return strictly a JSON object with this exact structure:
     const { senderName, senderContact, subject, message } = req.body;
     const msgRecord = {
       id: 'msg-' + Date.now(),
-      recipient: 'Disnaka Seneviratne',
+      recipient: 'Disnaka',
       recipientPhone: '0771774033',
       senderName: senderName || 'Anonymous',
       senderContact: senderContact || 'Not provided',
@@ -2116,8 +2128,8 @@ Return strictly a JSON object with this exact structure:
       createdAt: new Date().toISOString(),
     };
     contactMessagesStore.push(msgRecord);
-    console.log('[Direct Contact] New message for Disnaka Seneviratne (0771774033):', msgRecord);
-    res.json({ success: true, message: 'Message successfully sent to Disnaka Seneviratne' });
+    console.log('[Direct Contact] New message for Disnaka (0771774033):', msgRecord);
+    res.json({ success: true, message: 'Message successfully sent to Disnaka' });
   });
 
   app.get('/api/contact/messages', (req, res) => {
@@ -3460,7 +3472,19 @@ Return strictly a JSON object with this exact structure:
   app.get('/api/econ-books', (req, res) => {
     const sanitizedBooks = econBooksStore.map((b) => {
       if (b.id === 'book-ranul-001' || (b.title && b.title.toUpperCase().includes('TRAGIC MIS-FORTUNE')) || (b.author && b.author.toLowerCase().includes('ranul'))) {
-        return { ...b, author: '' };
+        const copy = { 
+          ...b, 
+          author: 'Disnaka', 
+          downloadUrl: '', 
+          readOnlineUrl: 'https://online.fliphtml5.com/EconMatrix/asck/', 
+          flipHtml5Url: 'https://online.fliphtml5.com/EconMatrix/asck/',
+          fileFormat: '3D FlipHTML5',
+          priceLKR: 3500,
+          isPaidBook: true,
+          allowDownload: false,
+        };
+        delete (copy as any).pages;
+        return copy;
       }
       return b;
     });
@@ -3606,6 +3630,16 @@ Return strictly a JSON object with this exact structure:
       res.status(404).json({ success: false, error: 'Book treatise not found.' });
       return;
     }
+
+    // Strict DRM Protection: Paid Monographs cannot be downloaded
+    if (book.id === 'book-ranul-001' || book.title.toUpperCase().includes('TRAGIC MIS-FORTUNE') || book.allowDownload === false || book.isPaidBook) {
+      res.status(403).json({
+        success: false,
+        error: 'File downloading is strictly disabled for this protected monograph. Full reading access is provided exclusively via the in-browser interactive 3D FlipHTML5 reader.',
+      });
+      return;
+    }
+
     res.json({
       success: true,
       message: `Download started for treatise: "${book.title}"`,
@@ -3616,12 +3650,41 @@ Return strictly a JSON object with this exact structure:
 
   // Book Purchase & Access Verification Endpoints
   app.post('/api/econ-books/purchase', (req, res) => {
-    const { bookId, customerName, customerEmail, buyerName, buyerEmail, paymentMethod, amount, amountLKR } = req.body;
+    const { bookId, customerName, customerEmail, customerPhone, phone, buyerName, buyerEmail, paymentMethod, amount, amountLKR } = req.body;
     const book = econBooksStore.find((b) => b.id === bookId || String(b.id) === String(bookId)) || econBooksStore[0];
     const accessCode = `BK-PERMIT-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const finalAmount = Number(amount || amountLKR) || (book?.priceLKR || 2500);
+    const finalAmount = Number(amount || amountLKR) || (book?.priceLKR || 3500);
     const clientName = customerName || buyerName || 'Valued Reader';
     const clientEmail = customerEmail || buyerEmail || 'reader@lankaecon.lk';
+    const clientPhone = customerPhone || phone || '';
+
+    const invoiceNum = `INV-BK-${Date.now().toString().slice(-6)}`;
+    const newTaxInvoice: TaxInvoice = {
+      invoiceNumber: invoiceNum,
+      issueDate: new Date().toISOString().split('T')[0],
+      invoiceDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date().toISOString().split('T')[0],
+      clientName,
+      customerName: clientName,
+      clientEmail,
+      customerEmail: clientEmail,
+      clientTin: 'INDIVIDUAL-READER',
+      clientAddress: 'Online Delivery Platform, Econ Academy',
+      customerAddress: 'Online Delivery Platform, Econ Academy',
+      serviceDescription: `Monograph Digital Edition: ${book ? book.title : "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE"} (Lifetime Online Streaming Access License)`,
+      description: `Monograph Digital Edition: ${book ? book.title : "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE"} (Rs. 3,500 LKR License)`,
+      businessUnit: 'Econ Academy',
+      netAmountLKR: Math.round(finalAmount / 1.205),
+      ssclTaxLKR: Math.round(finalAmount * 0.025),
+      vatTaxLKR: Math.round(finalAmount * 0.18),
+      grossTotalLKR: finalAmount,
+      amountLKR: finalAmount,
+      currency: 'LKR',
+      status: 'ISSUED',
+      paymentStatus: 'paid',
+      paymentMethod: paymentMethod || 'Online Payment Gateway (PayHere)',
+    };
+    taxInvoicesStore.unshift(newTaxInvoice);
 
     const newPurchase = {
       id: `PURCHASE-${Date.now()}`,
@@ -3629,9 +3692,11 @@ Return strictly a JSON object with this exact structure:
       bookTitle: book ? book.title : "THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE",
       customerName: clientName,
       customerEmail: clientEmail,
+      customerPhone: clientPhone,
       amountLKR: finalAmount,
-      paymentMethod: paymentMethod || 'Credit / Debit Card Gateway',
+      paymentMethod: paymentMethod || 'Credit / Debit Card Gateway (PayHere)',
       accessCode,
+      invoiceNumber: invoiceNum,
       purchasedAt: new Date().toISOString(),
       status: 'PAID_CONFIRMED' as const,
     };
@@ -3643,22 +3708,29 @@ Return strictly a JSON object with this exact structure:
       success: true,
       message: `🎉 Payment Confirmed! Digital access unlocked for "${newPurchase.bookTitle}".`,
       accessCode,
+      invoiceNumber: invoiceNum,
       purchase: newPurchase,
     });
   });
 
   app.get('/api/econ-books/verify-purchase', (req, res) => {
-    const { bookId, accessCode, email } = req.query;
+    const { bookId, accessCode, email, phone } = req.query;
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanCode = accessCode ? String(accessCode).trim().toUpperCase() : '';
+    const cleanPhone = phone ? String(phone).trim() : '';
+
     const found = bookPurchasesStore.find(
       (p) =>
-        (!bookId || p.bookId === bookId) &&
-        (p.accessCode === accessCode || (email && p.customerEmail.toLowerCase() === String(email).toLowerCase()))
+        (!bookId || p.bookId === bookId || (bookId === 'book-ranul-001' && p.bookTitle.toUpperCase().includes('TRAGIC MIS-FORTUNE'))) &&
+        ((cleanCode && p.accessCode.toUpperCase() === cleanCode) ||
+         (cleanEmail && p.customerEmail.toLowerCase() === cleanEmail) ||
+         (cleanPhone && p.customerPhone && p.customerPhone.includes(cleanPhone)))
     );
 
     if (found) {
       res.json({ success: true, verified: true, purchase: found });
     } else {
-      res.json({ success: true, verified: false, message: 'No valid purchase found for this access code or email.' });
+      res.json({ success: false, verified: false, message: 'No active paid purchase found for this email or permit code.' });
     }
   });
 
@@ -6023,13 +6095,27 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
         id: `LEDGER-BOOK-${b.id}`,
         date: b.purchasedAt.split('T')[0],
         category: 'Digital Book Sales Revenue',
-        description: `E-Book Purchase: ${b.bookTitle} (${b.customerName})`,
+        description: `Monograph Digital License: ${b.bookTitle} (${b.customerName})`,
         accountType: 'revenue',
         debitLKR: 0,
         creditLKR: b.amountLKR,
         amountLKR: b.amountLKR,
-        businessUnit: 'LankaInk Library',
+        businessUnit: 'Econ Academy',
         reference: b.accessCode || b.id,
+        quarter: 'Q3',
+        year: targetYear,
+      });
+      ledgerEntries.push({
+        id: `LEDGER-DEBIT-BOOK-${b.id}`,
+        date: b.purchasedAt.split('T')[0],
+        category: 'Payment Gateway / Bank Clearing',
+        description: `Payment Receipt: ${b.paymentMethod || 'Online Gateway'} - ${b.bookTitle} (${b.customerName})`,
+        accountType: 'asset',
+        debitLKR: b.amountLKR,
+        creditLKR: 0,
+        amountLKR: b.amountLKR,
+        businessUnit: 'Econ Academy',
+        reference: b.invoiceNumber || b.accessCode || b.id,
         quarter: 'Q3',
         year: targetYear,
       });

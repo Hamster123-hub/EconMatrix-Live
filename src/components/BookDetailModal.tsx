@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { EconBook } from '../types';
-import { safeSetStorage } from '../utils/safeStorage';
+import { CLASSICAL_BOOKS_DATA, BookLibraryDetails } from '../data/classicalBooksLibrary';
 import { 
-  X, BookOpen, CheckCircle, Lock, ShieldCheck, CreditCard, Sparkles, 
-  ChevronRight, Download, Eye, DollarSign, Award, Check, FileText, Globe, AlertCircle, RefreshCw
+  X, BookOpen, CheckCircle, ShieldCheck, Sparkles, 
+  Download, Eye, Award, FileText, Globe, ExternalLink, Info, AlertTriangle,
+  Lock, KeyRound, ShoppingBag, Check
 } from 'lucide-react';
+import { isBookPurchased, getBookPurchase } from '../utils/bookAccess';
+import { BookCheckoutModal } from './BookCheckoutModal';
 
 interface BookDetailModalProps {
   book: EconBook | null;
@@ -19,112 +22,95 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   isOpen,
   onClose,
   onOpenFlipbook,
-  language = 'en',
 }) => {
-  const isTragicBook = book ? (book.id === 'book-ranul-001' || book.title.toLowerCase().includes('tragic mis-fortune') || book.title.toLowerCase().includes('story behind')) : false;
-  const displayAuthor = isTragicBook || (book?.author && book.author.toLowerCase().includes('ranul')) ? '' : (book?.author || '');
+  const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'access'>('overview');
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'purchase'>('overview');
-  const [isPurchased, setIsPurchased] = useState<boolean>(false);
-  const [customerName, setCustomerName] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank' | 'paypal'>('card');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [accessCodeInput, setAccessCodeInput] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [purchaseSuccess, setPurchaseSuccess] = useState<{ accessCode: string; message: string } | null>(null);
+  const isTragicBook = book ? (
+    book.id === 'book-ranul-001' || 
+    book.title.toLowerCase().includes('tragic mis-fortune') || 
+    book.title.toLowerCase().includes('story behind')
+  ) : false;
+
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => !isTragicBook || (book ? isBookPurchased(book.id) : false));
+  const purchaseRecord = book ? getBookPurchase(book.id) : null;
 
   useEffect(() => {
-    if (!book) return;
-    // Check local storage for purchase status
-    try {
-      const storedKey = localStorage.getItem(`purchased_${book.id}`);
-      if (storedKey || book.id !== 'book-ranul-001') {
-        setIsPurchased(true);
-      } else {
-        setIsPurchased(false);
-      }
-    } catch (e) {
-      console.error(e);
+    if (book) {
+      setIsUnlocked(!isTragicBook || isBookPurchased(book.id));
     }
-  }, [book?.id]);
-
-  const handleProcessPurchase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customerEmail.trim()) {
-      alert('Please enter your email address to receive your digital reader receipt.');
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const res = await fetch('/api/econ-books/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId: book.id,
-          customerName: customerName.trim() || 'Valued Reader',
-          customerEmail: customerEmail.trim(),
-          paymentMethod: paymentMethod === 'card' ? 'Visa / MasterCard Credit Card' : paymentMethod === 'bank' ? 'SLIPS Direct Bank Deposit' : 'PayPal Express',
-          cardHolder: customerName,
-          cardDetails: cardNumber.slice(-4),
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setIsPurchased(true);
-        safeSetStorage(`purchased_${book.id}`, data.accessCode || 'PAID');
-        setPurchaseSuccess({
-          accessCode: data.accessCode,
-          message: data.message || 'Payment confirmed! Full 191-page digital flipbook unlocked.',
-        });
-      } else {
-        alert(data.error || 'Payment processing failed. Please check your card details.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Network error while processing payment. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleVerifyAccessCode = async () => {
-    if (!accessCodeInput.trim()) return;
-    setIsProcessing(true);
-    try {
-      if (accessCodeInput.trim().toUpperCase() === 'FREE2026' || accessCodeInput.trim().toUpperCase().startsWith('BK-PERMIT')) {
-        setIsPurchased(true);
-        safeSetStorage(`purchased_${book.id}`, accessCodeInput.trim());
-        setPurchaseSuccess({
-          accessCode: accessCodeInput.trim().toUpperCase(),
-          message: 'Access permit verified! Full book access unlocked.',
-        });
-      } else {
-        const res = await fetch(`/api/econ-books/verify-purchase?accessCode=${encodeURIComponent(accessCodeInput.trim())}`);
-        const data = await res.json();
-        if (data.verified) {
-          setIsPurchased(true);
-          safeSetStorage(`purchased_${book.id}`, accessCodeInput.trim());
-          setPurchaseSuccess({
-            accessCode: accessCodeInput.trim(),
-            message: 'Access permit verified! Full book access unlocked.',
-          });
-        } else {
-          alert('Invalid Access Key. Please enter a valid permit key or complete online purchase.');
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  }, [book, isTragicBook, isOpen]);
 
   if (!isOpen || !book) return null;
+
+  const displayAuthor = isTragicBook 
+    ? (book.author || 'Disnaka') 
+    : (book.author || '');
+
+  const libraryData: BookLibraryDetails | null = CLASSICAL_BOOKS_DATA[book.id] || null;
+
+  // Derive book details
+  const subtitle = isTragicBook 
+    ? "A Nation Held at Ransom by Its Own Central Bank" 
+    : libraryData?.subtitle || book.category || "Academic & Policy Research";
+
+  const volumeLabel = isTragicBook 
+    ? "191 Pages • 18 Chapters • Paid Edition (Rs. 3,500 LKR)"
+    : libraryData?.volumeLabel || (book.pagesCount ? `${book.pagesCount} Pages • Complete Edition` : 'Academic Edition');
+
+  const topics = isTragicBook
+    ? [
+        {
+          title: 'Monetary Policy & Central Bank Discretion',
+          description: 'Examines how unsterilized liquidity injections, Standing Lending Facility usage, and open market operations create excess money supply, driving rupee devaluation and high domestic inflation.',
+        },
+        {
+          title: 'The Impossible Trinity & Balance of Payments',
+          description: "Analyzes Sri Lanka's historical trilemma: attempting to fix interest rates below market equilibrium, manage foreign exchange pegs, and maintain open trade flows simultaneously.",
+        },
+        {
+          title: 'Overnight Policy Rate (OPR) & IMF Frameworks',
+          description: 'Provides step-by-step evaluation of the Central Bank of Sri Lanka Act No. 16 of 2023, the single overnight policy rate corridor, flexible inflation targeting, and debt restructuring timelines.',
+        },
+        {
+          title: 'Constitutional & Legislative Reforms',
+          description: "Proposes concrete legal reforms to restrict fiscal dominance, prohibit debt monetization, and establish strict monetary rules to safeguard Sri Lanka's national currency.",
+        },
+      ]
+    : libraryData?.keyTopics || [
+        {
+          title: 'Foundational Economic Methodology',
+          description: `Core economic models and principles introduced in ${book.title}.`,
+        },
+        {
+          title: 'Market Structure & Policy Analysis',
+          description: 'Empirical and theoretical foundations governing prices, production, and institutional policy.',
+        },
+      ];
+
+  const tableOfContents = isTragicBook
+    ? [
+        { chapterNumber: 'Ch. 1', title: 'The Surface of Circulation (Marx vs Classical Predecessors)', summary: 'C-M-C circuit, metamorphosis of commodities, and the classical money veil.' },
+        { chapterNumber: 'Ch. 2', title: 'Money as Social Movement in the Form of a Thing', summary: 'Labor theory of value in money, commodity fetishism, and currency tokens.' },
+        { chapterNumber: 'Ch. 3', title: 'How Much Money Is Needed? Quantity and Velocity', summary: 'Fisherian equation of exchange, real income, and circulation requirements.' },
+        { chapterNumber: 'Ch. 4', title: 'David Hume: Quantity Theory & Price-Specie-Flow', summary: 'Automatic balance of payments adjustments and the specie-flow mechanism.' },
+        { chapterNumber: 'Ch. 5', title: "Ricardo, Say's Law, and the Question of Crisis", summary: 'Capital accumulation, glut controversies, and classical monetary neutrality.' },
+        { chapterNumber: 'Ch. 6', title: "Marx: Attacking Hume & Ricardo's Monetary Theory", summary: 'Separation of sale and purchase as the genetic possibility of crises.' },
+        { chapterNumber: 'Ch. 7', title: 'Classical View: Interest, Money and Capital', summary: 'Loanable funds theory, natural vs market rate of interest.' },
+        { chapterNumber: 'Ch. 8', title: 'The Keynesian Revolution: Money and Uncertainty', summary: 'Liquidity preference, animal spirits, and radical uncertainty.' },
+        { chapterNumber: 'Ch. 9', title: 'Three Visions of Money and Capitalism', summary: 'Synthesis of classical, Marxist, and Keynesian macroeconomic schools.' },
+        { chapterNumber: 'Ch. 10', title: 'Delineating Economic Policy: Monetary vs. Fiscal Operations', summary: 'Independent central bank plumbing vs Treasury debt issuance.' },
+        { chapterNumber: 'Ch. 11', title: 'The Ledger of Nations: Balance of Payments & Twin Deficits', summary: 'Current account identity CA = S - I and foreign reserve mechanics.' },
+        { chapterNumber: 'Ch. 12', title: 'Exchange Rate Regimes and the Impossible Trinity', summary: 'The trilemma: independent rates, fixed FX, and free capital mobility.' },
+        { chapterNumber: 'Ch. 13', title: "Sri Lanka's New Monetary Regime (The 2023 Central Bank Act)", summary: 'Flexible inflation targeting, statutory independence, and OPR framework.' },
+        { chapterNumber: 'Ch. 14–18', title: 'OPR Corridor, Debt Restructuring & Monetary Constitution', summary: 'Operational guidelines for permanent rupee stability.' },
+      ]
+    : libraryData?.tableOfContents || [
+        { chapterNumber: 'Book I', title: 'Foundational Principles', summary: book.description || 'Core theoretical principles and definitions.' },
+        { chapterNumber: 'Book II', title: 'Policy Applications', summary: 'Institutional implementations and empirical cases.' },
+      ];
+
+  const preview = libraryData?.previewExcerpt || null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
@@ -140,15 +126,15 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded">
                   {book.category || 'Monetary Economics'}
                 </span>
-                {isPurchased ? (
+                {isTragicBook ? (
                   <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-emerald-400" />
-                    <span>Access Unlocked</span>
+                    <span>3D FlipHTML5 Reader Linked</span>
                   </span>
                 ) : (
-                  <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-rose-300" />
-                    <span>Purchase Required for Full Access</span>
+                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono text-[10px] font-bold uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-400" />
+                    <span>Free Open Access Library</span>
                   </span>
                 )}
               </div>
@@ -161,6 +147,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer shrink-0"
+            title="Close Window"
           >
             <X className="w-5 h-5" />
           </button>
@@ -177,31 +164,33 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Book Overview & Topics</span>
+            <span>{isTragicBook ? 'Contents & Overview (Free Preview)' : 'Book Overview & Structure'}</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`px-4 py-2 text-xs font-mono font-bold uppercase rounded transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'preview'
-                ? 'bg-amber-500 text-slate-950 shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Eye className="w-4 h-4 text-sky-400" />
-            <span>Read Free Chapter 1 Preview</span>
-          </button>
+          {!isTragicBook && (
+            <button
+              onClick={() => setActiveTab('preview')}
+              className={`px-4 py-2 text-xs font-mono font-bold uppercase rounded transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'preview'
+                  ? 'bg-amber-500 text-slate-950 shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Eye className="w-4 h-4 text-sky-400" />
+              <span>Read Chapter Excerpt</span>
+            </button>
+          )}
 
           <button
-            onClick={() => setActiveTab('purchase')}
+            onClick={() => setActiveTab('access')}
             className={`px-4 py-2 text-xs font-mono font-bold uppercase rounded transition cursor-pointer flex items-center gap-2 ${
-              activeTab === 'purchase'
+              activeTab === 'access'
                 ? 'bg-amber-500 text-slate-950 shadow'
                 : 'text-amber-400 border border-amber-500/40 hover:bg-amber-500/10'
             }`}
           >
-            <CreditCard className="w-4 h-4" />
-            <span>{isPurchased ? 'Read Online / Flipbook' : 'Purchase Online Access (LKR 2,500)'}</span>
+            <Globe className="w-4 h-4" />
+            <span>{isTragicBook ? '3D FlipHTML5 Reader' : 'Online Document & Reader'}</span>
           </button>
         </div>
 
@@ -218,44 +207,99 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 />
                 <div className="space-y-3 flex-1 text-center md:text-left">
                   <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-extrabold uppercase px-3 py-0.5 rounded-full">
-                    <span>191 PAGES COMPLETE</span>
-                    <span>•</span>
-                    <span>REVISED 2026 EDITION</span>
+                    <span>{volumeLabel}</span>
                   </div>
                   <h3 className="font-serif font-black text-xl text-white leading-tight">
                     {book.title}
                   </h3>
                   <p className="font-serif text-sm text-amber-200/90 italic font-bold">
-                    "A Nation Held at Ransom by Its Own Central Bank"
+                    "{subtitle}"
                   </p>
                   <p className="text-xs font-mono text-slate-300">
-                    {displayAuthor ? <>Author: <strong className="text-white">{displayAuthor}</strong> | </> : null}Published: <strong className="text-white">{book.publishedYear}</strong>
+                    {displayAuthor ? <>Author: <strong className="text-white">{displayAuthor}</strong> | </> : null}
+                    Published / Edition: <strong className="text-white">{book.publishedYear}</strong>
                   </p>
+
                   <div className="flex flex-wrap gap-2 pt-2 justify-center md:justify-start">
-                    {isPurchased ? (
-                      <button
-                        onClick={() => onOpenFlipbook(book)}
-                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-lg"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        <span>Launch 3D Interactive Flipbook</span>
-                      </button>
+                    {isTragicBook ? (
+                      isUnlocked ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              onClose();
+                              onOpenFlipbook(book);
+                            }}
+                            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-lg"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            <span>Launch 3D Flipbook (Unlocked)</span>
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('access')}
+                            className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4 text-amber-400" />
+                            <span>Read In Modal</span>
+                          </button>
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-1.5 rounded-lg">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>License Active (No Download)</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setShowCheckoutModal(true)}
+                            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-xl"
+                          >
+                            <Lock className="w-4 h-4" />
+                            <span>Unlock Full Book (Rs. 3,500 LKR)</span>
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('access')}
+                            className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer"
+                          >
+                            <KeyRound className="w-4 h-4 text-sky-400" />
+                            <span>Restore Access</span>
+                          </button>
+                        </>
+                      )
                     ) : (
-                      <button
-                        onClick={() => setActiveTab('purchase')}
-                        className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-lg"
-                      >
-                        <Lock className="w-4 h-4" />
-                        <span>Unlock Full Access (LKR 2,500)</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onOpenFlipbook(book);
+                          }}
+                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-lg"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          <span>Open In-App Book Reader</span>
+                        </button>
+                        {book.readOnlineUrl && (
+                          <a
+                            href={book.readOnlineUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Read Document on Web</span>
+                          </a>
+                        )}
+                        {book.downloadUrl && (
+                          <a
+                            href={book.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Download PDF</span>
+                          </a>
+                        )}
+                      </>
                     )}
-                    <button
-                      onClick={() => setActiveTab('preview')}
-                      className="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition cursor-pointer"
-                    >
-                      <Eye className="w-4 h-4 text-sky-400" />
-                      <span>Read Free Chapter 1</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -263,390 +307,336 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               {/* What This Book Talks About */}
               <div className="space-y-3">
                 <h4 className="font-serif font-bold text-base text-amber-400 border-b border-slate-800 pb-2">
-                  What This Book Talks About
+                  What This Work Examines
                 </h4>
                 <p className="text-sm text-slate-300 leading-relaxed font-serif">
                   {book.description}
                 </p>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-lg space-y-2">
-                    <h5 className="font-mono font-bold text-xs text-amber-300 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>Monetary Policy & Central Bank Discretion</span>
-                    </h5>
-                    <p className="text-xs text-slate-400 leading-normal">
-                      Examines how unsterilized liquidity injections, Standing Lending Facility usage, and open market operations create excess money supply, driving rupee devaluation and high domestic inflation.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-lg space-y-2">
-                    <h5 className="font-mono font-bold text-xs text-amber-300 flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-sky-400" />
-                      <span>The Impossible Trinity & Balance of Payments</span>
-                    </h5>
-                    <p className="text-xs text-slate-400 leading-normal">
-                      Analyzes Sri Lanka's historical trilemma: attempting to fix interest rates below market equilibrium, manage foreign exchange pegs, and maintain open trade flows simultaneously.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-lg space-y-2">
-                    <h5 className="font-mono font-bold text-xs text-amber-300 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Overnight Policy Rate (OPR) & IMF Frameworks</span>
-                    </h5>
-                    <p className="text-xs text-slate-400 leading-normal">
-                      Provides step-by-step evaluation of the Central Bank of Sri Lanka Act No. 16 of 2023, the single overnight policy rate corridor, flexible inflation targeting, and debt restructuring timelines.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-lg space-y-2">
-                    <h5 className="font-mono font-bold text-xs text-amber-300 flex items-center gap-2">
-                      <Award className="w-4 h-4 text-purple-400" />
-                      <span>Constitutional & Legislative Reforms</span>
-                    </h5>
-                    <p className="text-xs text-slate-400 leading-normal">
-                      Proposes concrete legal reforms to restrict fiscal dominance, prohibit debt monetization, and establish strict monetary rules to safeguard Sri Lanka's national currency.
-                    </p>
-                  </div>
+                  {topics.map((t, idx) => (
+                    <div key={idx} className="bg-slate-900/80 border border-slate-800 p-4 rounded-lg space-y-2">
+                      <h5 className="font-mono font-bold text-xs text-amber-300 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>{t.title}</span>
+                      </h5>
+                      <p className="text-xs text-slate-400 leading-normal">
+                        {t.description}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Table of Contents Summary */}
               <div className="space-y-3 pt-2">
+                {isTragicBook && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="font-mono text-amber-400 font-bold uppercase text-[10px] block">Free Table of Contents Preview</span>
+                        <p className="text-slate-300 text-xs">
+                          Anyone can inspect the full 18-chapter outline and summaries below. Full 191-page digital flipbook access is Rs. 3,500.
+                        </p>
+                      </div>
+                    </div>
+                    {!isUnlocked && (
+                      <button
+                        onClick={() => setShowCheckoutModal(true)}
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg transition cursor-pointer shrink-0 shadow flex items-center gap-1.5"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Unlock Full Book (Rs. 3,500)</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <h4 className="font-serif font-bold text-base text-amber-400 border-b border-slate-800 pb-2">
-                  18-Chapter Table of Contents
+                  Table of Contents & Structure
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-slate-300">
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 1</span>
-                    <span className="truncate">Foundations of Monetary Hegemony & Discretion</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 2</span>
-                    <span className="truncate">Central Bank Balance Sheet Mechanics</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 3</span>
-                    <span className="truncate">Open Market Operations & Interbank Liquidity</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 4</span>
-                    <span className="truncate">The Impossible Trinity in Sri Lanka</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 5</span>
-                    <span className="truncate">Currency Pegs & Exchange Rate Collapse</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 6</span>
-                    <span className="truncate">Fiscal Dominance & Treasury Monetization</span>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded border border-slate-800 flex items-center gap-2">
-                    <span className="text-amber-400 font-bold">Ch. 7-18</span>
-                    <span className="truncate">IMF Restructuring, OPR Transition & Legal Frameworks</span>
-                  </div>
+                  {tableOfContents.map((ch, idx) => (
+                    <div key={idx} className="p-2.5 bg-slate-900 rounded border border-slate-800 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold">{ch.chapterNumber}</span>
+                        <span className="font-semibold text-white truncate">{ch.title}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 line-clamp-1">{ch.summary}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === 'preview' && (
+          {activeTab === 'preview' && !isTragicBook && preview && (
             <div className="space-y-6">
               <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-mono text-amber-400 font-bold uppercase block">FREE CHAPTER PREVIEW</span>
-                  <h4 className="font-serif font-bold text-base text-white">CHAPTER I: The Foundations of Monetary Hegemony & Central Bank Discretion</h4>
+                  <span className="text-[10px] font-mono text-amber-400 font-bold uppercase block">CLASSICAL TEXT EXCERPT</span>
+                  <h4 className="font-serif font-bold text-base text-white">{preview.chapterTitle}</h4>
                 </div>
                 <button
-                  onClick={() => setActiveTab('purchase')}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1.5 rounded transition cursor-pointer shrink-0"
+                  onClick={() => {
+                    onClose();
+                    onOpenFlipbook(book);
+                  }}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold px-3.5 py-2 rounded transition cursor-pointer shrink-0 flex items-center gap-1.5"
                 >
-                  Unlock All 18 Chapters
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Launch In-App Reader</span>
                 </button>
               </div>
 
-              {/* Free Chapter Text */}
+              {/* Chapter Text */}
               <div className="bg-[#FAF9F6] text-slate-950 p-6 sm:p-10 rounded-xl shadow-lg font-serif space-y-4 leading-relaxed max-w-3xl mx-auto border border-amber-200">
                 <div className="text-center space-y-1 border-b border-amber-900/20 pb-4 mb-4">
-                  <span className="font-mono text-xs font-bold text-amber-900 uppercase tracking-widest block">EXCERPT • CHAPTER 1</span>
-                  <h3 className="text-2xl font-black text-slate-950">The Foundations of Monetary Hegemony</h3>
+                  <span className="font-mono text-xs font-bold text-amber-900 uppercase tracking-widest block">{book.title}</span>
+                  <h3 className="text-2xl font-black text-slate-950">{preview.sectionTitle}</h3>
                   {displayAuthor ? <p className="text-xs font-bold text-amber-800 italic">By {displayAuthor}</p> : null}
                 </div>
 
-                <p className="text-sm font-medium">
-                  The central bank of any sovereign nation exercises a legal monopoly over the issuance of fiat money. In Sri Lanka, the Central Bank of Sri Lanka (CBSL), established under the Monetary Law Act No. 58 of 1949 and updated under the CBSL Act of 2023, stands as the sole authority managing money supply, credit conditions, and external reserves.
-                </p>
-
-                <p className="text-sm font-medium">
-                  However, the exercising of discretionary monetary power without strict, non-negotiable quantitative rules leads inevitably to monetary distortion. When the central bank purchases Treasury bills directly from the primary market or injects liquidity via Standing Lending Facilities to artificially suppress interest rates below market clearing levels, it creates purchasing power unbacked by real economic productivity.
-                </p>
-
-                <div className="p-4 bg-amber-100/80 border-l-4 border-amber-800 rounded text-xs text-amber-950 font-serif italic my-4">
-                  "Money creation unbacked by real production is a silent tax upon every rupee holder in the nation. It systematically dilutes purchasing power, drives capital flight, and exhausts official foreign reserves."
-                </div>
-
-                <p className="text-sm font-medium">
-                  In open market economics, the relationship between domestic money supply and the balance of payments is inviolable. Excess rupee liquidity generated by the central bank overflows into the foreign exchange market as importers convert newly created rupees into foreign currency to acquire imported goods. Without sufficient foreign reserves or rising interest rates to sterilize this liquidity, the exchange rate faces overwhelming depreciation pressure.
-                </p>
-
-                {/* Lock Overlay Banner inside preview */}
-                <div className="bg-gradient-to-br from-slate-900 to-[#0F1E36] text-white p-6 rounded-xl border border-amber-500/40 text-center space-y-3 mt-8">
-                  <Lock className="w-8 h-8 text-amber-400 mx-auto" />
-                  <h4 className="font-serif font-bold text-lg text-white">End of Free Chapter 1 Preview</h4>
-                  <p className="text-xs text-slate-300 max-w-lg mx-auto">
-                    You have completed the free sample of Chapter 1. To read the full 191-page treatise (Chapters 2 to 18) and access the 3D interactive flipbook, please purchase digital reader access.
+                {preview.paragraphs.map((p, idx) => (
+                  <p key={idx} className="text-sm font-medium">
+                    {p}
                   </p>
-                  <button
-                    onClick={() => setActiveTab('purchase')}
-                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-6 py-2.5 rounded-lg shadow-lg transition cursor-pointer"
-                  >
-                    Purchase Full Book Access (LKR 2,500)
-                  </button>
-                </div>
+                ))}
+
+                {preview.quote && (
+                  <div className="p-4 bg-amber-100/80 border-l-4 border-amber-800 rounded text-xs text-amber-950 font-serif italic my-4">
+                    "{preview.quote}"
+                  </div>
+                )}
+
+                {preview.keyFormula && (
+                  <div className="bg-slate-900 text-amber-300 font-mono text-xs p-3 rounded border border-slate-800">
+                    <span className="text-slate-400 text-[10px] uppercase block">Key Identity / Proposition:</span>
+                    <strong>{preview.keyFormula}</strong>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {activeTab === 'purchase' && (
+          {activeTab === 'access' && (
             <div className="space-y-6">
-              {isPurchased ? (
-                <div className="bg-gradient-to-br from-slate-900 to-[#0F1E36] border-2 border-emerald-500/50 p-8 rounded-xl text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40">
-                    <CheckCircle className="w-8 h-8" />
-                  </div>
-                  <h3 className="font-serif font-black text-2xl text-white">
-                    Full Digital Access Unlocked!
-                  </h3>
-                  <p className="text-sm text-slate-300 max-w-lg mx-auto">
-                    You have active lifetime online reader access to <strong className="text-white">"{book.title}"</strong>.
-                  </p>
-                  {purchaseSuccess?.accessCode && (
-                    <div className="inline-block bg-slate-950 border border-slate-800 px-4 py-2 rounded-lg font-mono text-xs text-amber-400">
-                      Permit Code: <strong>{purchaseSuccess.accessCode}</strong>
+              {isTragicBook ? (
+                isUnlocked ? (
+                  /* Active 3D FlipHTML5 Reader for Unlocked Purchaser */
+                  <div className="space-y-4">
+                    <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <strong className="text-amber-400 font-serif text-sm">THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE</strong>
+                        <span className="text-emerald-400 font-mono text-[10px] uppercase bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">License Verified</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onOpenFlipbook(book);
+                          }}
+                          className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3.5 py-1.5 rounded transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>Fullscreen Mode</span>
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <div className="pt-2 flex flex-wrap justify-center gap-3">
+
+                    {/* DRM Notice Banner */}
+                    <div className="bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-lg flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 select-none">
+                      <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Protected Online Streaming Edition • Local File Download Disabled</span>
+                      </div>
+                      {purchaseRecord?.customerName && (
+                        <span>
+                          Licensed to: <strong className="text-white">{purchaseRecord.customerName}</strong> ({purchaseRecord.accessCode})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Embedded FlipHTML5 Reader Container */}
+                    <div 
+                      onContextMenu={(e) => e.preventDefault()} 
+                      className="w-full bg-black rounded-xl overflow-hidden border border-slate-800 shadow-2xl select-none"
+                    >
+                      <div style={{ position: 'relative', paddingTop: 'max(60%, 324px)', width: '100%', height: 0 }}>
+                        <iframe
+                          style={{ position: 'absolute', border: 'none', width: '100%', height: '100%', left: 0, top: 0 }}
+                          src="https://online.fliphtml5.com/EconMatrix/asck/"
+                          title="THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE"
+                          scrolling="no"
+                          frameBorder="0"
+                          allowFullScreen
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Paywall View for Locked Monograph */
+                  <div className="bg-gradient-to-br from-slate-900 to-[#0F1E36] border-2 border-amber-500/50 p-6 sm:p-8 rounded-2xl space-y-6 text-center">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto shadow-inner">
+                      <Lock className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-mono text-amber-400 font-bold uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+                        Paid Research Publication • Single-User Web License
+                      </span>
+                      <h3 className="font-serif font-black text-2xl text-white">
+                        Unlock Full 191-Page Monograph
+                      </h3>
+                      <p className="text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
+                        Lifetime online reading access to <strong className="text-white">"THE STORY BEHIND SRI LANKA'S TRAGIC MIS-FORTUNE"</strong> in our high-definition 3D interactive flipbook.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 max-w-md mx-auto text-left space-y-3 font-mono text-xs">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                        <span className="text-slate-400">Monograph Price</span>
+                        <strong className="text-amber-400 text-lg font-black">Rs. 3,500 LKR</strong>
+                      </div>
+                      <div className="space-y-1.5 text-slate-300 text-[11px]">
+                        <p className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Full 18 Chapters (Complete 191 Pages)</span>
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>3D Interactive Flipbook with Page Physics</span>
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>AI Economic Reading Tutor & Analysis</span>
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Official IRD Tax Invoice & Access Permit</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Strict Anti-Download & DRM Notice */}
+                    <div className="bg-slate-950 border border-amber-500/30 p-3.5 rounded-xl max-w-md mx-auto text-left text-xs font-mono text-amber-200/90 flex items-start gap-2.5">
+                      <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <strong className="text-white block">Protected Online Streaming Edition:</strong>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          To protect the author's copyright, local file downloading to laptops or mobile phones is strictly disabled. Full access is granted online via web browser.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                      <button
+                        onClick={() => setShowCheckoutModal(true)}
+                        className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm px-8 py-3.5 rounded-xl shadow-xl transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>Unlock Full Book — Rs. 3,500 LKR</span>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveTab('overview')}
+                        className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs px-5 py-3.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <FileText className="w-4 h-4 text-sky-400" />
+                        <span>Browse Table of Contents (Free)</span>
+                      </button>
+
+                      <button
+                        onClick={() => setShowCheckoutModal(true)}
+                        className="w-full sm:w-auto bg-transparent hover:bg-slate-800 text-slate-400 font-bold text-xs px-4 py-3.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <KeyRound className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Restore Access</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* Free Access & Reading for other classical books */
+                <div className="bg-gradient-to-br from-slate-900 to-[#0F1E36] border-2 border-emerald-500/50 p-8 rounded-xl space-y-6">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40">
+                      <CheckCircle className="w-8 h-8" />
+                    </div>
+                    <h3 className="font-serif font-black text-2xl text-white">
+                      Free Academic & Public Domain Access
+                    </h3>
+                    <p className="text-sm text-slate-300 max-w-lg mx-auto">
+                      <strong className="text-white">"{book.title}"</strong> is an open-access classical or policy publication available freely for scholarly study.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto pt-2">
                     <button
                       onClick={() => {
                         onClose();
                         onOpenFlipbook(book);
                       }}
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm px-6 py-3 rounded-lg flex items-center gap-2 transition cursor-pointer shadow-xl"
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition cursor-pointer shadow-lg text-center"
                     >
-                      <BookOpen className="w-5 h-5" />
-                      <span>Launch 3D Interactive Flipbook</span>
+                      <BookOpen className="w-6 h-6" />
+                      <span>Launch In-App Reader</span>
+                      <span className="text-[10px] opacity-80 font-normal">Interactive text reader</span>
                     </button>
+
+                    {book.readOnlineUrl ? (
+                      <a
+                        href={book.readOnlineUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-sky-900/80 hover:bg-sky-800 text-sky-100 border border-sky-600/50 font-bold text-xs p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition cursor-pointer shadow text-center"
+                      >
+                        <ExternalLink className="w-6 h-6 text-sky-300" />
+                        <span>Read on Project Gutenberg</span>
+                        <span className="text-[10px] text-sky-300 font-mono">Official Web Source</span>
+                      </a>
+                    ) : null}
+
+                    {book.downloadUrl ? (
+                      <a
+                        href={book.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-emerald-900/80 hover:bg-emerald-800 text-emerald-100 border border-emerald-600/50 font-bold text-xs p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition cursor-pointer shadow text-center"
+                      >
+                        <Download className="w-6 h-6 text-emerald-300" />
+                        <span>Download Free PDF</span>
+                        <span className="text-[10px] text-emerald-300 font-mono">Full eBook Download</span>
+                      </a>
+                    ) : null}
                   </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  {/* Left Column: Summary & Pricing */}
-                  <div className="md:col-span-5 bg-slate-900/90 border border-slate-800 p-5 rounded-xl space-y-4">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono text-amber-400 font-bold uppercase">DIGITAL BOOK ACCESS</span>
-                      <h4 className="font-serif font-bold text-base text-white">{book.title}</h4>
-                      {displayAuthor ? <p className="text-xs text-slate-400">By {displayAuthor}</p> : null}
-                    </div>
-
-                    <div className="p-4 bg-slate-950 border border-slate-800 rounded-lg space-y-2">
-                      <div className="flex justify-between text-xs text-slate-300">
-                        <span>Digital Reader Access (191 Pages):</span>
-                        <span className="font-mono font-bold text-white">LKR 2,500</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-slate-300">
-                        <span>3D Interactive FlipHTML5 License:</span>
-                        <span className="font-mono text-emerald-400 font-bold">INCLUDED</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-slate-300">
-                        <span>International Price:</span>
-                        <span className="font-mono text-sky-400 font-bold">$12.50 USD</span>
-                      </div>
-                      <div className="border-t border-slate-800 pt-2 flex justify-between text-sm font-bold text-amber-400">
-                        <span>Total Payable:</span>
-                        <span className="font-mono text-base">LKR 2,500</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 text-xs text-slate-400">
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span>Instant Online Reading in 3D Flipbook</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span>Lifetime Access & Multi-Device Compatibility</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span>Official Digital Reader Receipt Issued</span>
-                      </div>
-                    </div>
-
-                    {/* Quick Access Permit Box */}
-                    <div className="border-t border-slate-800 pt-4 space-y-2">
-                      <label className="block text-[11px] font-mono font-bold text-slate-300 uppercase">
-                        Have an Access Permit Key / Promo Code?
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={accessCodeInput}
-                          onChange={(e) => setAccessCodeInput(e.target.value)}
-                          placeholder="e.g., FREE2026 or BK-PERMIT-..."
-                          className="bg-slate-950 border border-slate-700 text-white text-xs px-3 py-2 rounded flex-1 font-mono focus:border-amber-500 outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleVerifyAccessCode}
-                          disabled={isProcessing}
-                          className="bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-mono font-bold px-3 py-2 rounded transition cursor-pointer"
-                        >
-                          Verify
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Checkout Form */}
-                  <form onSubmit={handleProcessPurchase} className="md:col-span-7 bg-slate-900/90 border border-slate-800 p-5 rounded-xl space-y-4">
-                    <h4 className="font-serif font-bold text-base text-amber-400 border-b border-slate-800 pb-2 flex items-center justify-between">
-                      <span>Complete Online Payment</span>
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    </h4>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-mono font-bold text-slate-300 mb-1">
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder="e.g. Kamal Perera"
-                          className="w-full bg-slate-950 border border-slate-700 text-white text-xs p-2.5 rounded focus:border-amber-500 outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-mono font-bold text-slate-300 mb-1">
-                          Email Address (for Digital Permit & Receipt) *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={customerEmail}
-                          onChange={(e) => setCustomerEmail(e.target.value)}
-                          placeholder="reader@example.com"
-                          className="w-full bg-slate-950 border border-slate-700 text-white text-xs p-2.5 rounded focus:border-amber-500 outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-mono font-bold text-slate-300 mb-1">
-                          Select Payment Option
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('card')}
-                            className={`p-2.5 rounded border text-xs font-mono text-center transition cursor-pointer ${
-                              paymentMethod === 'card'
-                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                                : 'bg-slate-950 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            💳 Credit / Debit Card
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('bank')}
-                            className={`p-2.5 rounded border text-xs font-mono text-center transition cursor-pointer ${
-                              paymentMethod === 'bank'
-                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                                : 'bg-slate-950 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            🏦 SLIPS Bank Transfer
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('paypal')}
-                            className={`p-2.5 rounded border text-xs font-mono text-center transition cursor-pointer ${
-                              paymentMethod === 'paypal'
-                                ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
-                                : 'bg-slate-950 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            🌐 PayPal / Stripe
-                          </button>
-                        </div>
-                      </div>
-
-                      {paymentMethod === 'card' && (
-                        <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg space-y-3">
-                          <div>
-                            <label className="block text-[11px] font-mono text-slate-400 mb-1">Card Number</label>
-                            <input
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => setCardNumber(e.target.value)}
-                              placeholder="4111 2222 3333 4444"
-                              className="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded focus:border-amber-500 outline-none font-mono"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[11px] font-mono text-slate-400 mb-1">Expiry (MM/YY)</label>
-                              <input
-                                type="text"
-                                value={cardExpiry}
-                                onChange={(e) => setCardExpiry(e.target.value)}
-                                placeholder="12/28"
-                                className="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded focus:border-amber-500 outline-none font-mono"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-mono text-slate-400 mb-1">CVC / CVV</label>
-                              <input
-                                type="text"
-                                value={cardCvc}
-                                onChange={(e) => setCardCvc(e.target.value)}
-                                placeholder="123"
-                                className="w-full bg-slate-900 border border-slate-700 text-white text-xs p-2 rounded focus:border-amber-500 outline-none font-mono"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isProcessing}
-                      className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm py-3 rounded-lg shadow-lg transition cursor-pointer flex items-center justify-center gap-2 mt-4"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Processing Secure Payment...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="w-4 h-4" />
-                          <span>Pay LKR 2,500 & Unlock Full Book Access</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
                 </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Book Checkout & Payment Gateway Modal */}
+        <BookCheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={() => setShowCheckoutModal(false)}
+          book={book}
+          onSuccess={() => {
+            setIsUnlocked(true);
+            setShowCheckoutModal(false);
+            setActiveTab('access');
+          }}
+          onViewTableOfContents={() => {
+            setShowCheckoutModal(false);
+            setActiveTab('overview');
+          }}
+        />
       </div>
     </div>
   );

@@ -553,7 +553,7 @@ function drawInstagramStory(
   roundRect(ctx, cardX + 26, cardY + 22, badgeWidth, 42, 8);
   ctx.fill();
   ctx.fillStyle = palette.headerText;
-  ctx.font = '900 17px system-ui, -apple-system, sans-serif';
+  ctx.font = '900 19px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'left';
 
   const badgeTitle =
@@ -572,7 +572,7 @@ function drawInstagramStory(
   roundRect(ctx, cardX + cardW - 240, cardY + 22, 214, 42, 8);
   ctx.stroke();
   ctx.fillStyle = '#0369A1';
-  ctx.font = '900 16px monospace';
+  ctx.font = '900 18px monospace';
   ctx.textAlign = 'center';
   ctx.fillText(categoryName, cardX + cardW - 133, cardY + 49);
 
@@ -589,7 +589,7 @@ function drawInstagramStory(
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#334155';
-  ctx.font = 'bold 18px monospace';
+  ctx.font = 'bold 20px monospace';
   ctx.fillText(
     `BY ${authorByline.toUpperCase()} • ${dateStr.toUpperCase()} • ${article.reading_time_minutes || 3} MIN READ`,
     cardX + 30,
@@ -598,10 +598,10 @@ function drawInstagramStory(
 
   let curY = cardY + 140;
 
-  // 7. Headline Rendering - bold 42px font with comfortable leading for crystal clear readability
+  // 7. Headline Rendering - bold 46px font with comfortable leading for crystal clear readability
   ctx.fillStyle = palette.titleText;
-  ctx.font = 'bold 42px "Georgia", "Times New Roman", serif';
-  curY = wrapText(ctx, article.title, cardX + 30, curY, cardW - 60, 52, 3);
+  ctx.font = 'bold 46px "Georgia", "Times New Roman", serif';
+  curY = wrapText(ctx, article.title, cardX + 30, curY, cardW - 60, 57, 3);
   curY += 12;
 
   // Key Metrics Corridor (if present)
@@ -611,7 +611,7 @@ function drawInstagramStory(
     const metricsToDraw = keyNumbers.slice(0, 5);
 
     metricsToDraw.forEach((num) => {
-      ctx.font = '900 20px monospace';
+      ctx.font = '900 22px monospace';
       const textWidth = ctx.measureText(num).width;
       const pillW = textWidth + 28;
 
@@ -650,10 +650,10 @@ function drawInstagramStory(
 
   // Header banner on narrative container
   ctx.fillStyle = palette.headerBg;
-  roundRect(ctx, pointsBoxX + 18, pointsBoxY + 14, 420, 36, 6);
+  roundRect(ctx, pointsBoxX + 18, pointsBoxY + 14, 430, 36, 6);
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 15px system-ui, -apple-system, sans-serif';
+  ctx.font = '900 17px system-ui, -apple-system, sans-serif';
   const boxBannerText =
     storyMode === 'entire_story'
       ? '📖 FULL STORY • COMPLETE DISPATCH'
@@ -661,7 +661,7 @@ function drawInstagramStory(
   ctx.fillText(boxBannerText, pointsBoxX + 32, pointsBoxY + 38);
 
   // 9. DYNAMIC TYPESETTING ENGINE:
-  // Designed with much larger font minimums so text is immediately legible on mobile phones
+  // Designed with very slightly enlarged font scaling so text is immediately legible on mobile phones
   // Starting with generous breathing room below the header banner
   const textStartY = pointsBoxY + 96;
   const availH = (pointsBoxY + pointsBoxH - 24) - textStartY;
@@ -671,13 +671,13 @@ function drawInstagramStory(
     .map((p) => p.replace(/^[•\-\*]\s*/, '').trim())
     .filter(Boolean);
 
-  // Determine optimal font size (testing downward from 36px to 18px for high legibility)
-  let bestFontSize = 22;
-  let bestLineHeight = 34;
-  let bestParaGap = 20;
+  // Determine optimal font size (testing downward from 39.5px to 20.5px for high legibility)
+  let bestFontSize = 24.5;
+  let bestLineHeight = 37;
+  let bestParaGap = 22;
   let bestLinesByPara: string[][] = [];
 
-  for (let testSize = 36; testSize >= 18; testSize -= 0.5) {
+  for (let testSize = 39.5; testSize >= 20.5; testSize -= 0.5) {
     ctx.font = `600 ${testSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     const testLineHeight = Math.round(testSize * 1.48);
     const testParaGap = Math.round(testSize * 0.75);
@@ -700,9 +700,9 @@ function drawInstagramStory(
     }
   }
 
-  // Fallback for very extensive text, maintaining minimum 16px
+  // Fallback for very extensive text, maintaining minimum 19px
   if (bestLinesByPara.length === 0) {
-    bestFontSize = 16;
+    bestFontSize = 19;
     ctx.font = `600 ${bestFontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
     bestLineHeight = Math.round(bestFontSize * 1.42);
     bestParaGap = Math.round(bestFontSize * 0.6);
@@ -767,23 +767,23 @@ function drawInstagramStory(
 
   // Sticker Text
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 25px system-ui, -apple-system, sans-serif';
+  ctx.font = '900 26px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('🔗 TAP TO READ FULL ARTICLE & ANALYSIS', cardX + 34, stickerY + 44);
   ctx.fillStyle = palette.stickerSub;
-  ctx.font = 'bold 22px monospace';
+  ctx.font = 'bold 23px monospace';
   ctx.fillText(`lankaecon.lk/story/${article.article_id}`, cardX + 34, stickerY + 80);
 
   // Arrow button inside sticker
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 42px system-ui, -apple-system, sans-serif';
+  ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'right';
   ctx.fillText('↗', cardX + cardW - 34, stickerY + 66);
 
   // 11. Bottom Brand Watermark
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-  ctx.font = 'bold 16px monospace';
+  ctx.font = 'bold 17px monospace';
   ctx.fillText('ECON MATRIX NEWSROOM DISPATCH • OFFICIAL INSTAGRAM: @LANKAECON.LK', width / 2, 1850);
 
   // 12. Bottom Instagram Interaction Bar Mockup

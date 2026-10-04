@@ -6,8 +6,16 @@ export type { BookPage };
 
 // Dynamic helper function to generate or retrieve a book page
 export function getBookPage(pageNum: number, customPages?: BookPage[]): BookPage {
-  const defaultPages = getRanulBookFullPages();
-  const pagesToUse = customPages && customPages.length > 0 ? customPages : defaultPages;
+  const pagesToUse = customPages && customPages.length > 0 ? customPages : [];
+
+  if (pagesToUse.length === 0) {
+    return {
+      pageNumber: pageNum || 1,
+      chapterTitle: 'Document View',
+      partTitle: 'Economics Library',
+      content: '### Document Overview\nThis publication is available via its official digital link or downloaded document. Please use the toolbar options to view the full document.',
+    };
+  }
 
   const normalizedPage = Math.max(1, Math.min(pagesToUse.length, pageNum));
   const foundPage = pagesToUse.find((p) => p.pageNumber === normalizedPage);

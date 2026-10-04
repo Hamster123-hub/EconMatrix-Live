@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { EconBook, BookPage } from '../types';
 import { FormattedText } from './FormattedText';
 import { getBookPage, autoSplitTextIntoBookPages } from '../data/book191Pages';
-import { getRanulBookFullPages } from '../data/ranulBookFullText';
-import { exportBookToWordDocument } from '../utils/wordExporter';
+import { CLASSICAL_BOOKS_DATA } from '../data/classicalBooksLibrary';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, BookOpen, FileText, 
-  Sparkles, Printer, Search, List, Bookmark, X, Send, Bot, Check, Sliders, Download
+  Sparkles, Printer, Search, List, Bookmark, X, Send, Bot, Check, Sliders, Download, AlertTriangle, ExternalLink,
+  Lock, ShieldCheck, KeyRound, Monitor, Eye, ShoppingBag
 } from 'lucide-react';
+import { isBookPurchased, getBookPurchase } from '../utils/bookAccess';
+import { BookCheckoutModal } from './BookCheckoutModal';
 
 interface InteractiveBookReaderProps {
   book: EconBook;
@@ -27,122 +29,194 @@ interface Chapter {
 
 export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ book, onClose, language = 'en' }) => {
   const isTragicBook = book.id === 'book-ranul-001' || book.title.toLowerCase().includes('tragic mis-fortune') || book.title.toLowerCase().includes('story behind');
-  const displayAuthor = isTragicBook || (book.author && book.author.toLowerCase().includes('ranul')) ? '' : book.author;
+  const displayAuthor = isTragicBook ? (book.author || 'Disnaka') : (book.author || '');
 
-  // Dynamically retrieve book pages (or auto-split pasted content)
+  const libraryData = CLASSICAL_BOOKS_DATA[book.id] || null;
+
+  // Dynamically retrieve book pages
   const bookPages: BookPage[] = useMemo(() => {
+    if (isTragicBook) return [];
     if (book.pages && book.pages.length > 0) {
       return book.pages;
     }
-    if (book.id === 'book-ranul-001' || book.title.toLowerCase().includes('story behind') || (book.author && book.author.toLowerCase().includes('ranul'))) {
-      return getRanulBookFullPages();
+    if (libraryData?.samplePages && libraryData.samplePages.length > 0) {
+      return libraryData.samplePages;
     }
     const autoPages = autoSplitTextIntoBookPages(book.fullRawText || book.description || '');
     if (autoPages.length > 0) return autoPages;
-    return getRanulBookFullPages();
-  }, [book]);
+    return [
+      {
+        pageNumber: 1,
+        chapterTitle: 'Overview',
+        partTitle: book.category || 'Economics Library',
+        content: `### ${book.title}\n**${displayAuthor ? `By ${displayAuthor} (${book.publishedYear})` : `Academic Edition (${book.publishedYear})`}**\n\n${book.description || ''}`,
+      }
+    ];
+  }, [book, isTragicBook, libraryData, displayAuthor]);
+
+  // FlipHTML5 source URL for 3D reader
+  const flipUrl = book.flipHtml5Url || (book.readOnlineUrl?.includes('fliphtml5.com') ? book.readOnlineUrl : (isTragicBook ? 'https://online.fliphtml5.com/EconMatrix/asck/' : null));
 
   // Reader state
-  const [readerMode, setReaderMode] = useState<'flipbook' | 'text-reader' | 'pdf'>('flipbook');
+  const [readerMode, setReaderMode] = useState<'flipbook' | 'text-reader' | 'pdf'>(flipUrl ? 'flipbook' : 'text-reader');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const totalPages = Math.max(1, bookPages.length);
   const [viewLayout, setViewLayout] = useState<'two-page' | 'single-page'>('two-page');
 
-  // FlipHTML5 source URL for 3D reader
-  const flipUrl = book.flipHtml5Url || (book.readOnlineUrl?.includes('fliphtml5.com') ? book.readOnlineUrl : 'https://online.fliphtml5.com/EconMatrix/kbcg/');
+  // Purchase & DRM state
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => !isTragicBook || isBookPurchased(book.id));
+  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
+  const [previewTocExpanded, setPreviewTocExpanded] = useState<boolean>(false);
+  const purchaseRecord = getBookPurchase(book.id);
 
-  // Open standalone clean responsive window
-  const openStandaloneFlipbookWindow = () => {
-    const newWin = window.open('', '_blank');
-    if (newWin) {
-      const sanitizedTitle = (book.title || 'Economics Book').replace(/"/g, '&quot;');
-      const sanitizedAuthor = (displayAuthor ? ` • ${displayAuthor}` : '').replace(/"/g, '&quot;');
-      const sanitizedDesc = (book.description || '').slice(0, 140).replace(/"/g, '&quot;');
-      newWin.document.write(`
-        <!DOCTYPE html>
-        <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>${sanitizedTitle} - Interactive 3D Flipbook</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-            <style>
-              body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0B1320; color: #F8FAFC; margin: 0; padding: 0; }
-              .font-serif { font-family: 'Merriweather', serif; }
-              .font-mono { font-family: 'JetBrains Mono', monospace; }
-            </style>
-          </head>
-          <body class="min-h-screen flex flex-col bg-[#0B1320] text-slate-100">
-            <!-- Modern Navigation Bar -->
-            <nav class="sticky top-0 z-50 bg-[#0F172A]/95 backdrop-blur-md border-b border-slate-800 px-4 sm:px-8 py-3 flex items-center justify-between shadow-xl">
-              <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 font-black shadow-md font-mono text-base">
-                  EM
+  useEffect(() => {
+    setIsUnlocked(!isTragicBook || isBookPurchased(book.id));
+  }, [book.id, isTragicBook]);
+
+  useEffect(() => {
+    setReaderMode(flipUrl ? 'flipbook' : 'text-reader');
+    setCurrentPage(1);
+  }, [book.id, flipUrl]);
+
+  // PAYWALL LOCK SCREEN FOR PAID BOOK IF NOT PURCHASED
+  if (isTragicBook && !isUnlocked) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#0B1320] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="max-w-2xl w-full bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 sm:p-8 text-center space-y-6 shadow-2xl my-auto">
+          {/* Lock Icon */}
+          <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center mx-auto shadow-inner">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold px-3 py-1 rounded-full uppercase">
+              <span>Paid Research Monograph</span>
+              <span>•</span>
+              <span>Rs. 3,500 LKR</span>
+            </div>
+
+            <h2 className="font-serif font-black text-2xl sm:text-3xl text-white leading-tight">
+              {book.title}
+            </h2>
+            <p className="font-serif text-sm text-amber-200/90 italic font-medium">
+              "A Nation Held at Ransom by Its Own Central Bank"
+            </p>
+            <p className="text-xs font-mono text-slate-400">
+              By <strong className="text-white">{displayAuthor}</strong> • 191 Pages • 18 Chapters • 3D FlipHTML5
+            </p>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+            Full digital reading access to this 191-page treatise is available for a one-time license fee of <strong className="text-amber-400 font-mono">Rs. 3,500</strong>. You will receive lifetime online access within our web platform.
+          </p>
+
+          {/* Table of Contents Free Preview Accordion */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-left space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <h4 className="font-mono font-bold text-xs text-white uppercase tracking-wider">
+                  Table of Contents & Structure (Free Preview)
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewTocExpanded(!previewTocExpanded)}
+                className="text-amber-400 hover:text-amber-300 text-xs font-mono underline cursor-pointer"
+              >
+                {previewTocExpanded ? 'Collapse ▲' : 'View All 18 Chapters ▼'}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400">
+              Anyone can explore the table of contents and research scope below prior to purchasing.
+            </p>
+
+            {previewTocExpanded && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1 pt-2 border-t border-slate-800/80 font-mono text-[11px]">
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 1–2: Surface of Circulation</span>
+                  <span className="text-slate-300">Marx vs Classical Predecessors & Money as Social Movement</span>
                 </div>
-                <div>
-                  <span class="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block">ECON MATRIX • RESEARCH LIBRARY</span>
-                  <h1 class="font-serif font-bold text-sm sm:text-base text-white tracking-tight leading-none">${sanitizedTitle}</h1>
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 3–4: Quantity & Price Specie-Flow</span>
+                  <span className="text-slate-300">Fisherian Velocity & David Hume's Automatic Adjustment</span>
+                </div>
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 5–6: Ricardo, Say's Law & Crisis</span>
+                  <span className="text-slate-300">Classical Neutrality vs Separation of Sale & Purchase</span>
+                </div>
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 7–9: Three Master Visions of Money</span>
+                  <span className="text-slate-300">Loanable Funds, Keynesian Radical Uncertainty & Synthesis</span>
+                </div>
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 10–12: Monetary vs Fiscal & Impossible Trinity</span>
+                  <span className="text-slate-300">Balance of Payments, Twin Deficits & Soft Peg Failures</span>
+                </div>
+                <div className="p-2 bg-slate-900/90 rounded border border-slate-800">
+                  <span className="text-amber-400 font-bold block">Ch. 13–18: Sri Lanka 2023 Central Bank Act</span>
+                  <span className="text-slate-300">Overnight Policy Rate (OPR), Debt Restructuring & Reform</span>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
-                <button onclick="document.getElementById('flipbook-frame-container').requestFullscreen ? document.getElementById('flipbook-frame-container').requestFullscreen() : null" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3.5 py-1.5 rounded text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer">
-                  <span>Fullscreen Mode</span>
-                </button>
-                <button onclick="window.close()" class="bg-rose-950 hover:bg-rose-900 text-rose-200 border border-rose-800 px-3 py-1.5 rounded text-xs font-mono font-bold transition cursor-pointer">
-                  Close
-                </button>
-              </div>
-            </nav>
+            )}
+          </div>
 
-            <!-- Main Content Container -->
-            <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col items-center justify-center">
-              <!-- Title Section -->
-              <section class="text-center max-w-4xl mx-auto space-y-3 mb-8">
-                <div class="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-extrabold uppercase px-3.5 py-1 rounded-full shadow-xs">
-                  <span>📖 3D DIGITAL FLIPBOOK</span>
-                  <span>•</span>
-                  <span>${book.category || 'ECONOMICS'}</span>
-                </div>
-                <h1 class="font-serif text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
-                  ${sanitizedTitle}
-                </h1>
-                ${sanitizedDesc ? `<p class="font-serif text-base sm:text-xl text-amber-200/90 font-bold italic">"${sanitizedDesc}"</p>` : ''}
-                <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-400 pt-2 border-t border-slate-800/80 max-w-xl mx-auto">
-                  <span>Author: <strong class="text-white">${sanitizedAuthor}</strong></span>
-                  <span>•</span>
-                  <span>Volume: <strong class="text-white">${book.pagesCount || totalPages} Pages</strong></span>
-                  <span>•</span>
-                  <span>Edition: <strong class="text-white">${book.publishedYear || '2026'}</strong></span>
-                </div>
-              </section>
+          {/* Strict Anti-Download & DRM Notice */}
+          <div className="bg-slate-950/90 border border-amber-500/30 p-3.5 rounded-xl flex items-start gap-2.5 text-left text-xs font-mono text-amber-200/90">
+            <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <strong className="text-white block">Protected Single-User Online Streaming License:</strong>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                To safeguard the author's copyright, local file downloading to laptops or mobile phones is strictly disabled. Full access is granted exclusively within the in-app 3D flipbook reader.
+              </p>
+            </div>
+          </div>
 
-              <!-- Flipbook Centered Container -->
-              <div id="flipbook-frame-container" class="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-xl p-2 sm:p-4 shadow-2xl space-y-3">
-                <div class="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-lg flex items-center justify-between text-xs font-mono">
-                  <div class="flex items-center gap-2 text-slate-300">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="font-bold text-amber-400">Interactive 3D FlipHTML5 Reader</span>
-                  </div>
-                  <span class="text-slate-400 hidden sm:inline">Use corner drag, arrow keys or pinch to flip pages</span>
-                </div>
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => setShowCheckoutModal(true)}
+              className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm px-8 py-3.5 rounded-xl shadow-xl transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Lock className="w-4 h-4" />
+              <span>Unlock Full Book (Rs. 3,500 LKR)</span>
+            </button>
 
-                <div style="position:relative;padding-top:max(60%,324px);width:100%;height:0;">
-                  <iframe style="position:absolute;border:none;width:100%;height:100%;left:0;top:0;" src="${flipUrl}" title="${sanitizedTitle}" seamless="seamless" scrolling="no" frameborder="0" allowtransparency="true" allowfullscreen="true"></iframe>
-                </div>
-              </div>
-            </main>
+            <button
+              onClick={() => setShowCheckoutModal(true)}
+              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs px-5 py-3.5 rounded-xl transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-4 h-4 text-sky-400" />
+              <span>Restore Access</span>
+            </button>
 
-            <!-- Footer Bar -->
-            <footer class="bg-[#0F172A] border-t border-slate-800 py-4 text-center text-xs font-mono text-slate-400">
-              <p>Econ Matrix Research Publication • All Rights Reserved © ${book.publishedYear || '2026'}${sanitizedAuthor}</p>
-            </footer>
-          </body>
-        </html>
-      `);
-      newWin.document.close();
-    }
-  };
+            <button
+              onClick={onClose}
+              className="w-full sm:w-auto bg-transparent hover:bg-slate-800 text-slate-400 font-bold text-xs px-5 py-3.5 rounded-xl transition cursor-pointer"
+            >
+              Back to Library
+            </button>
+          </div>
+        </div>
+
+        {/* Checkout Modal */}
+        <BookCheckoutModal
+          isOpen={showCheckoutModal}
+          onClose={() => setShowCheckoutModal(false)}
+          book={book}
+          onSuccess={() => {
+            setIsUnlocked(true);
+            setShowCheckoutModal(false);
+          }}
+          onViewTableOfContents={() => {
+            setShowCheckoutModal(false);
+            setPreviewTocExpanded(true);
+          }}
+        />
+      </div>
+    );
+  }
 
   // Reader customization
   const [paperTheme, setPaperTheme] = useState<'cream' | 'white' | 'sepia' | 'dark'>('cream');
@@ -163,142 +237,36 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
   const [aiChat, setAiChat] = useState<{ role: 'user' | 'assistant'; text: string }[]>([
     {
       role: 'assistant',
-      text: `Welcome! I am your AI Reading Tutor for **${book.title}**${displayAuthor ? ` by **${displayAuthor}**` : ''}.\n\nAll 191 pages of this book are fully loaded! Ask me anything about any page, chapter, equation, or CBSL operational concept!`,
+      text: `Welcome! I am your AI Reading Companion for **${book.title}**${displayAuthor ? ` by **${displayAuthor}**` : ''}.\n\nAsk me anything about any chapter, theoretical proposition, historical context, or argument in this masterwork!`,
     }
   ]);
 
   // Bookmarks
   const [bookmarks, setBookmarks] = useState<number[]>([]);
 
-  // 191-PAGE TABLE OF CONTENTS DATA
-  const chapters: Chapter[] = useMemo(() => [
-    {
-      id: 'front',
-      chapterNumber: 'Front',
-      part: 'Front Matter',
-      title: 'Cover & Table of Contents',
-      pageStart: 1,
-      pageEnd: 8,
-      summary: 'Book title, author details, and full 18-chapter Table of Contents listing.'
-    },
-    {
-      id: 'preface',
-      chapterNumber: 'Preface',
-      part: 'Front Matter',
-      title: 'Preface & Note on Terminology and Conventions',
-      pageStart: 9,
-      pageEnd: 14,
-      summary: 'CBSL Repo vs Reverse Repo inversion, OPR, AWCMR, SLFR, SDFR, and exchange rate definitions.'
-    },
-    {
-      id: 'ch-1-3',
-      chapterNumber: '1 – 3',
-      part: 'Part I: Theoretical Framework',
-      title: 'Money in Motion: Marx, Hume, Ricardo & Quantity/Velocity',
-      pageStart: 15,
-      pageEnd: 20,
-      summary: 'C-M-C commodity metamorphosis, social labor in gold, Money Stock × Velocity = Total Prices.'
-    },
-    {
-      id: 'ch-4-8',
-      chapterNumber: '4 – 8',
-      part: 'Part I: Theoretical Framework',
-      title: 'Classical Economics, Hume, Smith, Ricardo & Loanable Funds',
-      pageStart: 21,
-      pageEnd: 34,
-      summary: 'Price-specie-flow mechanism, Adam Smith Great Wheel, Ricardian Ingot Plan, Loanable Funds Theory.'
-    },
-    {
-      id: 'ch-9-10',
-      chapterNumber: '9 – 10',
-      part: 'Part I: Theoretical Framework',
-      title: 'The Keynesian Revolution, Radical Uncertainty & Three Visions',
-      pageStart: 35,
-      pageEnd: 50,
-      summary: 'Keynes General Theory (1936), Liquidity Preference, Liquidity Trap, and New Neoclassical Synthesis.'
-    },
-    {
-      id: 'ch-12',
-      chapterNumber: 12,
-      part: 'Part II: Operational Reality',
-      title: 'Delineating Economic Policy: Monetary vs. Fiscal Operations',
-      pageStart: 51,
-      pageEnd: 66,
-      summary: 'Central Bank toolkit, OMOs, Reserve Requirements, Standing Facilities, and CBSL FIT framework.'
-    },
-    {
-      id: 'ch-13',
-      chapterNumber: 13,
-      part: 'Part II: Operational Reality',
-      title: 'The Ledger of Nations: Balance of Payments & Twin Deficits',
-      pageStart: 67,
-      pageEnd: 85,
-      summary: 'BoP equation BP = CA + KA + FA + E&O = 0, Net Exports function, CA = S - I, Twin Deficits.'
-    },
-    {
-      id: 'ch-14',
-      chapterNumber: 14,
-      part: 'Part II: Operational Reality',
-      title: 'Exchange Rate Regimes & The Impossible Trinity',
-      pageStart: 86,
-      pageEnd: 117,
-      summary: 'Mundell-Fleming Trilemma, Sterilization Trap, Singapore MAS NEER, Hong Kong Currency Board.'
-    },
-    {
-      id: 'ch-15',
-      chapterNumber: 15,
-      part: 'Part II: Operational Reality',
-      title: 'Sri Lanka’s New Monetary Regime & The September 2024 Debacle',
-      pageStart: 118,
-      pageEnd: 136,
-      summary: 'Central Bank Act No. 16 of 2023, Single OPR rate, LKR 133.6 Billion reverse repo injection case study.'
-    },
-    {
-      id: 'ch-16',
-      chapterNumber: 16,
-      part: 'Part II: Operational Reality',
-      title: 'The Continuation of Problem 1 – The New Architecture',
-      pageStart: 137,
-      pageEnd: 145,
-      summary: 'How Single Policy Rate works in Sri Lanka, interbank call rate as thermostat, operational discipline.'
-    },
-    {
-      id: 'ch-17',
-      chapterNumber: 17,
-      part: 'Part II: Operational Reality',
-      title: 'Dangers of "Flexible" Terminology & The Soft-Peg Trap',
-      pageStart: 146,
-      pageEnd: 162,
-      summary: 'Flexible vs Free Float, overtrading without deposits, Soft-Peg Ping-Pong, B.R. Shenoy warning.'
-    },
-    {
-      id: 'ch-18',
-      chapterNumber: 18,
-      part: 'Part II: Operational Reality',
-      title: 'Western Floor Systems vs Sri Lankan Scarce Reserves',
-      pageStart: 163,
-      pageEnd: 177,
-      summary: 'Bank of England Floor System (2006-2025), QE, SONIA, and contrast with CBSL Scarce Reserve system.'
-    },
-    {
-      id: 'prob-2',
-      chapterNumber: 'Problem 2',
-      part: 'Part II: Operational Reality',
-      title: 'Continuous Reserve Accumulation & 2025 Rupee Depreciation Paradox',
-      pageStart: 178,
-      pageEnd: 187,
-      summary: '2025 Rupee paradox ($2.0B FX purchases, LKR 788.9B liquidity injected), John Exter Law, Partial convertibility.'
-    },
-    {
-      id: 'final',
-      chapterNumber: 'Conclusion',
-      part: 'Back Matter',
-      title: 'Final Reflections: Discipline of Prosperity & Final Verdict',
-      pageStart: 188,
-      pageEnd: 191,
-      summary: 'Central thesis, lessons for students and policymakers, sound money as human right, final verdict.'
+  // DYNAMIC TABLE OF CONTENTS DATA
+  const chapters: Chapter[] = useMemo(() => {
+    if (libraryData?.tableOfContents && libraryData.tableOfContents.length > 0) {
+      return libraryData.tableOfContents.map((tc, idx) => ({
+        id: `ch-${idx}`,
+        chapterNumber: tc.chapterNumber,
+        part: book.category || 'Monetary & Economic Literature',
+        title: tc.title,
+        pageStart: tc.pageStart || (idx + 1),
+        pageEnd: tc.pageEnd || (idx + 1),
+        summary: tc.summary,
+      }));
     }
-  ], []);
+    return bookPages.map((bp) => ({
+      id: `page-${bp.pageNumber}`,
+      chapterNumber: bp.pageNumber,
+      part: bp.partTitle || book.category || 'Monetary & Economic Literature',
+      title: bp.chapterTitle || `Page ${bp.pageNumber}`,
+      pageStart: bp.pageNumber,
+      pageEnd: bp.pageNumber,
+      summary: bp.content.slice(0, 100),
+    }));
+  }, [libraryData, bookPages, book]);
 
   // Page navigation
   useEffect(() => {
@@ -393,7 +361,7 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
         body: JSON.stringify({
           prompt: `In the context of Page ${currentPage} (${leftPageData.chapterTitle}) of "${book.title}"${displayAuthor ? ` by ${displayAuthor}` : ''}: ${userText}`,
           chapterTitle: leftPageData.chapterTitle,
-          chapterSubtitle: `Page ${currentPage} of 191`,
+          chapterSubtitle: `Page ${currentPage} of ${totalPages}`,
           keyConcepts: book.category,
           chapterContext: leftPageData.content,
           language,
@@ -410,7 +378,7 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
         ...prev,
         {
           role: 'assistant',
-          text: `Analysis for Page ${currentPage} (${leftPageData.chapterTitle}):\n\n"${userText}"\n\nAccording to the 191-page treatise, monetary governance requires strict operational discipline. Liquidity injected via Reverse Repos below the SLFR penalty ceiling or unsterilized dollar purchases boomerangs into import credit demand and currency depreciation.`,
+          text: `Analysis for Page ${currentPage} (${leftPageData.chapterTitle}) in "${book.title}":\n\n"${userText}"\n\n${leftPageData.content ? leftPageData.content.slice(0, 200) + '...' : 'This chapter examines the core analytical framework of the publication.'}`,
         },
       ]);
     } finally {
@@ -489,41 +457,70 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
 
         {/* Center: Reader Mode */}
         <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-800 p-1">
-          <button
-            onClick={() => setReaderMode('flipbook')}
-            className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
-              readerMode === 'flipbook'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>3D Flipbook</span>
-          </button>
+          {isTragicBook ? (
+            <div className="flex items-center gap-2 px-3 py-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-xs font-mono font-bold text-amber-400 uppercase">
+                3D FlipHTML5 Reader (Protected In-Browser)
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                DRM Active
+              </span>
+            </div>
+          ) : (
+            <>
+              {flipUrl && (
+                <button
+                  onClick={() => setReaderMode('flipbook')}
+                  className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
+                    readerMode === 'flipbook'
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>3D Flipbook</span>
+                </button>
+              )}
 
-          <button
-            onClick={() => setReaderMode('text-reader')}
-            className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
-              readerMode === 'text-reader'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 text-sky-400" />
-            <span>191-Page Text Reader</span>
-          </button>
+              <button
+                onClick={() => setReaderMode('text-reader')}
+                className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
+                  readerMode === 'text-reader'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-sky-400" />
+                <span>{totalPages}-Page Text Reader</span>
+              </button>
 
-          <button
-            onClick={() => setReaderMode('pdf')}
-            className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
-              readerMode === 'pdf'
-                ? 'bg-amber-500 text-slate-950'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Full PDF View ({totalPages} Pages)</span>
-          </button>
+              <button
+                onClick={() => setReaderMode('pdf')}
+                className={`px-3 py-1 text-xs font-mono font-bold uppercase transition cursor-pointer flex items-center gap-1.5 ${
+                  readerMode === 'pdf'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Full Document View</span>
+              </button>
+
+              {book.readOnlineUrl && (
+                <a
+                  href={book.readOnlineUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 text-xs font-mono font-bold uppercase text-sky-400 hover:text-sky-300 transition flex items-center gap-1 border-l border-slate-800 ml-1"
+                  title="Open Official Web Document"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Web Document</span>
+                </a>
+              )}
+            </>
+          )}
         </div>
 
         {/* Right: Tools */}
@@ -567,14 +564,16 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
             <span className="hidden lg:inline text-[11px]">AI Tutor</span>
           </button>
 
-          <button
-            onClick={() => window.print()}
-            className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 p-2 text-xs font-mono transition flex items-center gap-1 cursor-pointer"
-            title="Print / Export PDF (All 191 Pages)"
-          >
-            <Printer className="w-4 h-4" />
-            <span className="hidden xl:inline text-[11px]">Print / Export</span>
-          </button>
+          {(!isTragicBook && book.allowDownload !== false) && (
+            <button
+              onClick={() => window.print()}
+              className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 p-2 text-xs font-mono transition flex items-center gap-1 cursor-pointer"
+              title="Print / Export Document"
+            >
+              <Printer className="w-4 h-4" />
+              <span className="hidden xl:inline text-[11px]">Print / Export</span>
+            </button>
+          )}
 
           <button
             onClick={onClose}
@@ -799,7 +798,7 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
 
         {/* VIEWPORT AREA */}
         <div className="flex-1 flex flex-col justify-between overflow-y-auto p-4 sm:p-8 items-center relative">
-          {readerMode === 'flipbook' ? (
+          {readerMode === 'flipbook' && flipUrl ? (
             /* 3D INTERACTIVE FLIPBOOK MODE (FLIPHTML5) */
             <div className="w-full max-w-6xl mx-auto my-auto space-y-6 flex flex-col items-center">
               {/* Title Section */}
@@ -841,39 +840,49 @@ export const InteractiveBookReader: React.FC<InteractiveBookReaderProps> = ({ bo
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={openStandaloneFlipbookWindow}
-                      className="bg-sky-900/80 hover:bg-sky-800 text-sky-200 border border-sky-700/60 px-3 py-1.5 rounded text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer"
-                      title="Open Clean Standalone Reader Window"
-                    >
-                      <Download className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Open Standalone Reader</span>
-                    </button>
-
-                    <button
                       onClick={() => {
                         const el = document.getElementById('flipbook-iframe-wrapper');
                         if (el && el.requestFullscreen) {
                           el.requestFullscreen();
                         }
                       }}
-                      className="bg-amber-600 hover:bg-amber-500 text-slate-950 px-3.5 py-1.5 rounded text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1"
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3.5 py-1.5 rounded text-xs font-mono font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
+                      title="Expand Flipbook Fullscreen In-Browser"
                     >
-                      <span>Fullscreen</span>
+                      <Monitor className="w-3.5 h-3.5" />
+                      <span>Fullscreen Mode</span>
                     </button>
                   </div>
                 </div>
 
+                {/* DRM Protected Notice for Paid Book */}
+                {isTragicBook && (
+                  <div className="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-400 select-none">
+                    <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Protected Online Streaming Edition • Local File Download Disabled</span>
+                    </div>
+                    {purchaseRecord?.customerName && (
+                      <span className="text-slate-400">
+                        Licensed Licensee: <strong className="text-white">{purchaseRecord.customerName}</strong> ({purchaseRecord.accessCode})
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Embedded Flipbook iframe provided by user */}
-                <div id="flipbook-iframe-wrapper" className="w-full bg-black rounded-lg overflow-hidden border border-slate-800 shadow-inner">
+                <div 
+                  id="flipbook-iframe-wrapper" 
+                  onContextMenu={(e) => e.preventDefault()} 
+                  className="w-full bg-black rounded-lg overflow-hidden border border-slate-800 shadow-inner select-none"
+                >
                   <div style={{ position: 'relative', paddingTop: 'max(60%, 324px)', width: '100%', height: 0 }}>
                     <iframe
                       style={{ position: 'absolute', border: 'none', width: '100%', height: '100%', left: 0, top: 0 }}
                       src={flipUrl}
                       title={book.title}
-                      seamless
                       scrolling="no"
                       frameBorder="0"
-                      allowTransparency
                       allowFullScreen
                     />
                   </div>
