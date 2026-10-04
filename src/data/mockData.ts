@@ -249,7 +249,7 @@ The tender includes comprehensive 2D and 3D seismic survey datasets acquired in 
     is_lead_story: true,
     is_breaking: false,
     is_featured: true,
-    featured_image_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
+    featured_image_url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
     image_caption: 'Petroleum Development Authority • Sri Lanka Licensing Round 2026',
     reading_time_minutes: 4,
     view_count: 3890,

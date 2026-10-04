@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import PDFDocument from 'pdfkit';
@@ -797,6 +798,11 @@ function handleGeminiError(context: string, err: any) {
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // High-performance response compression (gzip/deflate)
+  app.use(compression({
+    threshold: 1024,
+  }));
 
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
@@ -7092,8 +7098,18 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // High-performance asset caching: Vite hashed JS/CSS cached for 1 year immutable
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+    }));
+    app.use(express.static(distPath, {
+      maxAge: '1h',
+      etag: true,
+    }));
     app.get('*', (req, res) => {
+      // Prevent stale index.html caching so new deployments appear immediately
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

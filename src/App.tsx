@@ -37,7 +37,13 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>('modern_pro');
 
-  const [articles, setArticles] = useState<Article[]>(() => INITIAL_ARTICLES);
+  const [articles, setArticles] = useState<Article[]>(() => {
+    const cached = safeGetStorage<Article[]>('econmatrix_cached_articles', null);
+    if (Array.isArray(cached) && cached.length > 0) {
+      return cached;
+    }
+    return INITIAL_ARTICLES;
+  });
   const [tickers, setTickers] = useState<StockTicker[]>(() => INITIAL_TICKERS);
   const [marketOverview, setMarketOverview] = useState<any>(null);
   const [ads, setAds] = useState<AdCampaign[]>(() => INITIAL_ADS);
@@ -164,6 +170,7 @@ export default function App() {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.articles) && data.articles.length > 0) {
           setArticles(data.articles);
+          safeSetStorage('econmatrix_cached_articles', data.articles);
         }
       } else if (retryCount < 2) {
         setTimeout(() => fetchArticles(retryCount + 1), 2000);
@@ -282,6 +289,10 @@ export default function App() {
       (tabCat === 'world' && (artCat === 'world' || artCat === 'international' || artCat === 'global' || artCat === 'asia'));
 
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    const timeA = new Date(a.published_at || a.created_at || 0).getTime() || Number(a.article_id) || 0;
+    const timeB = new Date(b.published_at || b.created_at || 0).getTime() || Number(b.article_id) || 0;
+    return timeB - timeA;
   });
 
   const heroArticle = articles.find((a) => a.is_featured) || articles[0];
@@ -379,16 +390,21 @@ export default function App() {
               {/* 1. TOP INITIAL STORIES HERO (Matches Screenshot 1) */}
               {(() => {
                 // Strict Sort Hierarchy:
-                // 1. Breaking news stories ALWAYS on top until tag is removed in backend
-                // 2. Explicit lead story next
-                // 3. Newest uploaded / published stories first (descending timestamp order), cycling down existing stories
+                // 1. Breaking news stories ALWAYS on top
+                // 2. Newest articles always lead the homepage; lead-story flag acts as tie-breaker for same-day articles
                 const sortedArticles = [...filteredArticles].sort((a, b) => {
                   if (a.is_breaking && !b.is_breaking) return -1;
                   if (!a.is_breaking && b.is_breaking) return 1;
-                  if (a.is_lead_story && !b.is_lead_story) return -1;
-                  if (!a.is_lead_story && b.is_lead_story) return 1;
+                  
                   const timeA = new Date(a.published_at || a.created_at || 0).getTime() || Number(a.article_id) || 0;
                   const timeB = new Date(b.published_at || b.created_at || 0).getTime() || Number(b.article_id) || 0;
+                  
+                  const hoursDiff = Math.abs(timeA - timeB) / (1000 * 60 * 60);
+                  if (hoursDiff < 24) {
+                    if (a.is_lead_story && !b.is_lead_story) return -1;
+                    if (!a.is_lead_story && b.is_lead_story) return 1;
+                  }
+                  
                   return timeB - timeA;
                 });
 

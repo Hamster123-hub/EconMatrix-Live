@@ -86,7 +86,7 @@ export const InitialStoriesHero: React.FC<InitialStoriesHeroProps> = ({
             className="group cursor-pointer relative w-full aspect-[16/9] overflow-hidden bg-slate-900 border border-slate-200 shadow-2xs"
           >
             <img
-              src={leadStory.featured_image_url || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80'}
+              src={leadStory.featured_image_url || 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80'}
               alt={trLead.title}
               className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
             />
