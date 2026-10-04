@@ -334,7 +334,29 @@ function dispatchSubscriberArticleAlerts(article: Article): {
   };
 }
 
-const DATA_FILE_PATH = path.join(process.cwd(), 'data_store.json');
+// PERSISTENT STORAGE DIRECTORY (Survives git updates, code resets, and server redeploys)
+const PERSISTENT_STORAGE_DIR = (() => {
+  if (process.env.DATA_DIR && fs.existsSync(process.env.DATA_DIR)) {
+    return process.env.DATA_DIR;
+  }
+  // Dedicated persistent data folder on the Linux VPS outside the git repository
+  if (fs.existsSync('/var/www/econmatrix-data')) {
+    return '/var/www/econmatrix-data';
+  }
+  return process.cwd();
+})();
+
+const DATA_FILE_PATH = path.join(PERSISTENT_STORAGE_DIR, 'data_store.json');
+const DATA_BACKUP_PATH = path.join(PERSISTENT_STORAGE_DIR, 'data_store.backup.json');
+const UPLOADS_DIR = path.join(PERSISTENT_STORAGE_DIR, 'uploads');
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  try {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  } catch (e) {
+    console.warn('Could not initialize uploads directory:', e);
+  }
+}
 
 function saveStoresToDisk() {
   try {
@@ -361,7 +383,9 @@ function saveStoresToDisk() {
       bookPurchasesStore,
       adCampaignsStore,
     };
-    fs.writeFileSync(DATA_FILE_PATH, JSON.stringify(dataToSave, null, 2), 'utf-8');
+    const jsonStr = JSON.stringify(dataToSave, null, 2);
+    fs.writeFileSync(DATA_FILE_PATH, jsonStr, 'utf-8');
+    fs.writeFileSync(DATA_BACKUP_PATH, jsonStr, 'utf-8');
   } catch (err) {
     console.error('Failed to save data_store.json to disk:', err);
   }
@@ -369,8 +393,19 @@ function saveStoresToDisk() {
 
 function loadStoresFromDisk() {
   try {
-    if (fs.existsSync(DATA_FILE_PATH)) {
-      const raw = fs.readFileSync(DATA_FILE_PATH, 'utf-8');
+    let sourcePath = DATA_FILE_PATH;
+    if (!fs.existsSync(sourcePath) && fs.existsSync(DATA_BACKUP_PATH)) {
+      sourcePath = DATA_BACKUP_PATH;
+    } else if (!fs.existsSync(sourcePath)) {
+      // Fallback to local process.cwd() data_store.json if persistent dir doesn't have it yet
+      const fallbackLocal = path.join(process.cwd(), 'data_store.json');
+      if (fs.existsSync(fallbackLocal)) {
+        sourcePath = fallbackLocal;
+      }
+    }
+
+    if (fs.existsSync(sourcePath)) {
+      const raw = fs.readFileSync(sourcePath, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.articlesStore) && parsed.articlesStore.length > 0) {
         articlesStore = parsed.articlesStore.map((a: Article) => {
@@ -408,7 +443,7 @@ function loadStoresFromDisk() {
         mediaStore = parsed.mediaStore;
         // Self-heal and restore any uploaded image files from database to disk in uploads/
         try {
-          const uploadsDirPath = path.join(process.cwd(), 'uploads');
+          const uploadsDirPath = UPLOADS_DIR;
           if (!fs.existsSync(uploadsDirPath)) {
             fs.mkdirSync(uploadsDirPath, { recursive: true });
           }
@@ -766,8 +801,7 @@ async function startServer() {
   app.use(express.json({ limit: '100mb' }));
   app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-  // Static serving for local media uploads from computer
-  const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+  // Static serving for local media uploads from computer (persistent across deployments)
   if (!fs.existsSync(UPLOADS_DIR)) {
     try {
       fs.mkdirSync(UPLOADS_DIR, { recursive: true });
