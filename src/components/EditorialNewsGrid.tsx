@@ -92,6 +92,8 @@ export const HeadlineLeftThumbRightCard: React.FC<HeadlineLeftThumbRightCardProp
           <img
             src={article.featured_image_url}
             alt={trArt.title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
           />
         </div>

@@ -410,10 +410,14 @@ function loadStoresFromDisk() {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.articlesStore) && parsed.articlesStore.length > 0) {
         articlesStore = parsed.articlesStore.map((a: Article) => {
-          if (a.image_caption && a.image_caption.toLowerCase().includes('lankaecon news desk report')) {
-            return { ...a, image_caption: '' };
+          let updated = { ...a };
+          if (updated.image_caption && updated.image_caption.toLowerCase().includes('lankaecon news desk report')) {
+            updated.image_caption = '';
           }
-          return a;
+          if (updated.featured_image_url && updated.featured_image_url.includes('photo-1545324418-cc1a3fa10c00')) {
+            updated.featured_image_url = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
+          }
+          return updated;
         });
       }
       if (Array.isArray(parsed.econWritersStore) && parsed.econWritersStore.length > 0) econWritersStore = parsed.econWritersStore;
@@ -489,7 +493,7 @@ const DEFAULT_SEED_ADS: AdCampaign[] = [
     slotLocation: 'sidebar_top',
     category: 'LUXURY REAL ESTATE',
     targetUrl: 'https://primeresidencies.lk',
-    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
     adFormat: 'banner', // FULL BANNER FORMAT
     phoneNumber: '0702 777 777',
     badgeText: 'COLOMBO 05 EXCLUSIVE RESIDENCES',
@@ -559,7 +563,7 @@ const DEFAULT_SEED_ADS: AdCampaign[] = [
     slotLocation: 'feed_inline_2',
     category: 'LUXURY REAL ESTATE',
     targetUrl: 'https://primeresidencies.lk',
-    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1400&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=80',
     adFormat: 'banner', // FULL GRAPHIC DIRECT BANNER FORMAT
     isFullBanner: true,
     phoneNumber: '0702 777 777',
@@ -1557,15 +1561,18 @@ Extract exact month-end statistical values from the official CBSL MEI tables for
 
     // Sort articles:
     // 1. Breaking stories on top (until tag is removed)
-    // 2. Explicit lead story next (if designated)
-    // 3. Newest uploaded / published stories first (descending timestamp order)
+    // 2. Newest uploaded / published stories first (descending timestamp order)
+    // 3. Lead story flag acts as tie-breaker for stories within 12 hours
     list.sort((a, b) => {
       if (a.is_breaking && !b.is_breaking) return -1;
       if (!a.is_breaking && b.is_breaking) return 1;
-      if (a.is_lead_story && !b.is_lead_story) return -1;
-      if (!a.is_lead_story && b.is_lead_story) return 1;
       const timeA = new Date(a.published_at || a.created_at || 0).getTime() || Number(a.article_id) || 0;
       const timeB = new Date(b.published_at || b.created_at || 0).getTime() || Number(b.article_id) || 0;
+      const hoursDiff = Math.abs(timeA - timeB) / (1000 * 60 * 60);
+      if (hoursDiff < 12) {
+        if (a.is_lead_story && !b.is_lead_story) return -1;
+        if (!a.is_lead_story && b.is_lead_story) return 1;
+      }
       return timeB - timeA;
     });
 
@@ -2793,7 +2800,7 @@ Return strictly a JSON object with this exact structure:
         tagline: tagline || 'Partner with Sri Lanka’s leading commercial enterprise.',
         category: category || 'BUSINESS',
         targetUrl,
-        imageUrl: imageUrl || bannerImageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+        imageUrl: imageUrl || bannerImageUrl || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
         bannerImageUrl: bannerImageUrl || imageUrl,
         adFormat: adFormat === 'card' ? 'card' : 'banner',
         isFullBanner: adFormat === 'banner',
@@ -3204,7 +3211,7 @@ Return strictly a JSON object with this exact structure:
         tagline: tagline || '',
         category: 'SPONSOR',
         targetUrl: targetUrl || 'https://lankaecon.lk',
-        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
         adFormat: adFormat === 'card' ? 'card' : 'banner',
         isFullBanner: adFormat === 'banner',
         phoneNumber: phoneNumber || '',

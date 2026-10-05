@@ -186,19 +186,35 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
     let newCursorEnd: number;
 
     if (selectedText.length > 0) {
-      if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
-        const unwrapped = selectedText.slice(prefix.length, -suffix.length);
-        newText = original.substring(0, start) + unwrapped + original.substring(end);
-        newCursorStart = start;
-        newCursorEnd = start + unwrapped.length;
+      // Split leading and trailing whitespace so delimiters (** or *) never trap space inside
+      const match = selectedText.match(/^(\s*)([\s\S]*?)(\s*)$/);
+      const leadingSpace = match ? match[1] : '';
+      const coreText = match ? match[2] : selectedText;
+      const trailingSpace = match ? match[3] : '';
+
+      // Check if already bolded/italicized (with prefix & suffix or triple asterisks)
+      const isAlreadyWrapped =
+        (coreText.startsWith(prefix) && coreText.endsWith(suffix) && coreText.length >= prefix.length + suffix.length) ||
+        (prefix === '**' && coreText.startsWith('***') && coreText.endsWith('***') && coreText.length >= 6);
+
+      if (isAlreadyWrapped) {
+        let unwrapped = coreText;
+        if (prefix === '**' && unwrapped.startsWith('***') && unwrapped.endsWith('***')) {
+          unwrapped = unwrapped.slice(3, -3);
+        } else {
+          unwrapped = unwrapped.slice(prefix.length, -suffix.length);
+        }
+        newText = original.substring(0, start) + leadingSpace + unwrapped + trailingSpace + original.substring(end);
+        newCursorStart = start + leadingSpace.length;
+        newCursorEnd = newCursorStart + unwrapped.length;
       } else {
-        const wrapped = `${prefix}${selectedText}${suffix}`;
-        newText = original.substring(0, start) + wrapped + original.substring(end);
-        newCursorStart = start;
-        newCursorEnd = start + wrapped.length;
+        const wrapped = `${prefix}${coreText}${suffix}`;
+        newText = original.substring(0, start) + leadingSpace + wrapped + trailingSpace + original.substring(end);
+        newCursorStart = start + leadingSpace.length;
+        newCursorEnd = newCursorStart + wrapped.length;
       }
     } else {
-      const placeholder = defaultPlaceholder || 'text';
+      const placeholder = defaultPlaceholder || (prefix === '**' ? 'Bold Subheading / Text' : 'italic text');
       const inserted = `${prefix}${placeholder}${suffix}`;
       newText = original.substring(0, start) + inserted + original.substring(end);
       newCursorStart = start + prefix.length;
@@ -211,7 +227,7 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
         staffBodyTextareaRef.current.focus();
         staffBodyTextareaRef.current.setSelectionRange(newCursorStart, newCursorEnd);
       }
-    }, 15);
+    }, 10);
   };
   const [storyImageUrl, setStoryImageUrl] = useState('');
   const [storyPlacement, setStoryPlacement] = useState<'standard' | 'notable' | 'spotlight' | 'lead'>('standard');

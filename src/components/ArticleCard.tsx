@@ -141,6 +141,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
             <img
               src={article.featured_image_url}
               alt={displayTitle}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
             />
             {article.is_subscription_only && (
@@ -331,6 +333,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
             <img
               src={article.featured_image_url}
               alt={displayTitle}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
             />
           </div>

@@ -59,7 +59,7 @@ export const AdCenterSection: React.FC<AdCenterSectionProps> = ({ language = 'en
   const [formTargetUrl, setFormTargetUrl] = useState('https://primeresidencies.lk');
   const [formImageUrl, setFormImageUrl] = useState(
     initialPastedImage ||
-      'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80'
   );
   const [formPhoneNumber, setFormPhoneNumber] = useState('0702 777 777');
   const [formBadgeText, setFormBadgeText] = useState('COLOMBO 05 EXCLUSIVE RESIDENCES');
@@ -249,7 +249,7 @@ export const AdCenterSection: React.FC<AdCenterSectionProps> = ({ language = 'en
       setFormCategory('LUXURY REAL ESTATE');
       setFormSlotLocation('sidebar_top');
       setFormTargetUrl('https://primeresidencies.lk');
-      setFormImageUrl('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80');
+      setFormImageUrl('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80');
       setFormPhoneNumber('0702 777 777');
       setFormBadgeText('COLOMBO 05 EXCLUSIVE RESIDENCES');
       setFormCurrency('LKR');
@@ -909,7 +909,7 @@ export const AdCenterSection: React.FC<AdCenterSectionProps> = ({ language = 'en
                               source: 'url',
                             });
                           }}
-                          placeholder="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800"
+                          placeholder="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800"
                           className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 focus:border-amber-700 text-xs font-mono"
                         />
                         <p className="text-[10px] text-slate-500">
@@ -1004,7 +1004,7 @@ export const AdCenterSection: React.FC<AdCenterSectionProps> = ({ language = 'en
                         <div className="border-2 border-[#0B1E36] shadow-md rounded-lg overflow-hidden relative bg-slate-900">
                           <div className="w-full relative overflow-hidden bg-slate-900">
                             <img
-                              src={formImageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                              src={formImageUrl || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80'}
                               alt={formTitle}
                               className="w-full h-auto min-h-[180px] max-h-[380px] object-cover block"
                             />

@@ -38,9 +38,13 @@ export default function App() {
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>('modern_pro');
 
   const [articles, setArticles] = useState<Article[]>(() => {
-    const cached = safeGetStorage<Article[]>('econmatrix_cached_articles', null);
+    const cached = safeGetStorage<Article[]>('econmatrix_cached_articles_v2', null);
     if (Array.isArray(cached) && cached.length > 0) {
-      return cached;
+      const cachedTime = new Date(cached[0]?.published_at || cached[0]?.created_at || 0).getTime() || Number(cached[0]?.article_id) || 0;
+      const initialTime = new Date(INITIAL_ARTICLES[0]?.published_at || INITIAL_ARTICLES[0]?.created_at || 0).getTime() || Number(INITIAL_ARTICLES[0]?.article_id) || 0;
+      if (cachedTime >= initialTime) {
+        return cached;
+      }
     }
     return INITIAL_ARTICLES;
   });
@@ -150,7 +154,7 @@ export default function App() {
   // Initial Fetch Data & Live Market Feed polling
   useEffect(() => {
     fetchArticles();
-    fetchMarketData(true);
+    fetchMarketData(false); // Fast immediate response without blocking on remote external scraping
     fetchAds();
 
     const intervalId = setInterval(() => {
@@ -170,7 +174,7 @@ export default function App() {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.articles) && data.articles.length > 0) {
           setArticles(data.articles);
-          safeSetStorage('econmatrix_cached_articles', data.articles);
+          safeSetStorage('econmatrix_cached_articles_v2', data.articles);
         }
       } else if (retryCount < 2) {
         setTimeout(() => fetchArticles(retryCount + 1), 2000);

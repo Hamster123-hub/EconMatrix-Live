@@ -88,6 +88,8 @@ export const InitialStoriesHero: React.FC<InitialStoriesHeroProps> = ({
             <img
               src={leadStory.featured_image_url || 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80'}
               alt={trLead.title}
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
             />
             {leadStory.image_caption && leadStory.image_caption.trim() && !leadStory.image_caption.toLowerCase().includes('lankaecon news desk report') && (
@@ -144,6 +146,8 @@ export const InitialStoriesHero: React.FC<InitialStoriesHeroProps> = ({
                 <img
                   src={secondaryStory1.featured_image_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80'}
                   alt={trSec1.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 />
               </div>
@@ -193,6 +197,8 @@ export const InitialStoriesHero: React.FC<InitialStoriesHeroProps> = ({
                 <img
                   src={secondaryStory2.featured_image_url || 'https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=800&q=80'}
                   alt={trSec2.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 />
               </div>

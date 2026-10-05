@@ -85,7 +85,7 @@ const DEFAULT_SIDE_ADS: AdCampaign[] = [
     slotLocation: 'sidebar_top',
     category: 'LUXURY REAL ESTATE',
     targetUrl: 'https://primeresidencies.lk',
-    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
     adFormat: 'banner', // FULL COMPANY AD BANNER
     phoneNumber: '0702 777 777',
     badgeText: 'COLOMBO 05 EXCLUSIVE RESIDENCES',
@@ -352,7 +352,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
               {/* Full Graphic Ad Banner Image */}
               <div className="w-full relative overflow-hidden bg-slate-900">
                 <img
-                  src={topAd.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                  src={topAd.imageUrl || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80'}
                   alt={topAd.title}
                   className="w-full h-auto min-h-[180px] max-h-[420px] object-cover group-hover/banner:scale-[1.01] transition duration-500 block"
                 />
@@ -1013,7 +1013,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
                     >
                       <div className="w-full relative overflow-hidden bg-slate-900">
                         <img
-                          src={ad.imageUrl || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                          src={ad.imageUrl || 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80'}
                           alt={ad.title}
                           className="w-full h-auto min-h-[160px] max-h-[380px] object-cover group-hover/bcard:scale-[1.01] transition duration-500 block"
                         />

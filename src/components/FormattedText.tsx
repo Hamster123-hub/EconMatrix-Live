@@ -16,22 +16,42 @@ export const extractGoogleDocId = (urlStr: string): string | null => {
   return match ? match[1] : null;
 };
 
-// Helper to parse inline markdown (**bold**, *italic*, `code`, $math$, [link](url))
+// Helper to parse inline markdown (***bold***, **bold**, *italic*, `code`, $math$, [link](url))
 const renderInlineMarkdown = (text: string, isDarkBg = false): React.ReactNode[] => {
   if (!text) return [];
   
-  // Regex to match **bold**, *italic*, `code`, $math$, [text](url)
-  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`|\$.*?\$|\[.*?\]\(.*?\))/g;
+  // Regex to match ***bold***, **bold**, *italic*, `code`, $math$, [text](url), <b>text</b>, <strong>text</strong>
+  const regex = /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`|\$.*?\$|\[.*?\]\(.*?\)|<b\b[^>]*>.*?<\/b>|<strong\b[^>]*>.*?<\/strong>)/gi;
   const parts = text.split(regex);
 
   return parts.map((part, i) => {
     if (!part) return null;
 
-    // Bold **text**
-    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-      const inner = part.slice(2, -2);
+    // Bold ***text*** or **text**
+    if ((part.startsWith('***') && part.endsWith('***') && part.length >= 6) ||
+        (part.startsWith('**') && part.endsWith('**') && part.length >= 4)) {
+      const isTriple = part.startsWith('***');
+      const inner = isTriple ? part.slice(3, -3).trim() : part.slice(2, -2).trim();
       return (
-        <strong key={i} className={`font-extrabold ${isDarkBg ? 'text-amber-300' : 'text-slate-950'}`}>
+        <strong
+          key={i}
+          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-black'}`}
+          style={{ color: isDarkBg ? undefined : '#000000', fontWeight: 900 }}
+        >
+          {inner}
+        </strong>
+      );
+    }
+
+    // HTML <b>...</b> or <strong>...</strong>
+    if (/^<b\b[^>]*>(.*?)<\/b>$/i.test(part) || /^<strong\b[^>]*>(.*?)<\/strong>$/i.test(part)) {
+      const inner = part.replace(/^<[^>]+>|<\/[^>]+>$/g, '').trim();
+      return (
+        <strong
+          key={i}
+          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-black'}`}
+          style={{ color: isDarkBg ? undefined : '#000000', fontWeight: 900 }}
+        >
           {inner}
         </strong>
       );
@@ -276,8 +296,8 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
             [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_ul]:space-y-1.5 [&_ul]:text-sm [&_ul]:sm:text-base
             [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ol]:space-y-1.5 [&_ol]:text-sm [&_ol]:sm:text-base
             [&_li]:leading-relaxed [&_li]:my-1
-            [&_strong]:font-black [&_strong]:text-slate-950
-            [&_b]:font-black [&_b]:text-slate-950
+            [&_strong]:font-black [&_strong]:text-black [&_strong]:font-extrabold
+            [&_b]:font-black [&_b]:text-black [&_b]:font-extrabold
             [&_em]:italic [&_em]:font-serif
             [&_blockquote]:my-4 [&_blockquote]:p-4 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-600 [&_blockquote]:bg-amber-50/80 [&_blockquote]:rounded-xs [&_blockquote]:italic [&_blockquote]:font-serif
             [&_table]:w-full [&_table]:border-2 [&_table]:border-[#0B1E36] [&_table]:my-5 [&_table]:rounded-xs [&_table]:shadow-md [&_table]:border-collapse

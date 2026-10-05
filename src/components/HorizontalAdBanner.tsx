@@ -54,7 +54,7 @@ const DEFAULT_PRIME_AD: AdCampaign = {
   slotLocation: 'feed_inline_2',
   category: 'LUXURY REAL ESTATE',
   targetUrl: 'https://primeresidencies.lk',
-  imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1400&q=80',
+  imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=80',
   adFormat: 'banner',
   isFullBanner: true,
   phoneNumber: '0702 777 777',

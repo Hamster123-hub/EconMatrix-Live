@@ -12,18 +12,39 @@ import { ExternalLink, FileText } from 'lucide-react';
 export const renderArticleParagraph = (text: string, isDarkBg = false): React.ReactNode => {
   if (!text) return null;
 
-  // Regex to match **bold**, *italic*, `code`, [text](url), or standalone URLs (https?://\S+)
-  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\)|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  // Regex to match ***bold***, **bold**, *italic*, `code`, [text](url), <b>text</b>, <strong>text</strong>, or standalone URLs (https?://\S+)
+  const regex = /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\)|<b\b[^>]*>.*?<\/b>|<strong\b[^>]*>.*?<\/strong>|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
   const parts = text.split(regex);
 
   return parts.map((part, i) => {
     if (!part) return null;
 
-    // Bold **text**
-    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+    // Bold ***text*** or **text**
+    if ((part.startsWith('***') && part.endsWith('***') && part.length >= 6) ||
+        (part.startsWith('**') && part.endsWith('**') && part.length >= 4)) {
+      const isTriple = part.startsWith('***');
+      const inner = isTriple ? part.slice(3, -3).trim() : part.slice(2, -2).trim();
       return (
-        <strong key={i} className={`font-bold ${isDarkBg ? 'text-white' : 'text-slate-950'}`}>
-          {part.slice(2, -2)}
+        <strong
+          key={i}
+          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-white' : 'text-black'}`}
+          style={{ color: isDarkBg ? '#FFFFFF' : '#000000', fontWeight: 900 }}
+        >
+          {inner}
+        </strong>
+      );
+    }
+
+    // HTML <b>...</b> or <strong>...</strong>
+    if (/^<b\b[^>]*>(.*?)<\/b>$/i.test(part) || /^<strong\b[^>]*>(.*?)<\/strong>$/i.test(part)) {
+      const inner = part.replace(/^<[^>]+>|<\/[^>]+>$/g, '').trim();
+      return (
+        <strong
+          key={i}
+          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-white' : 'text-black'}`}
+          style={{ color: isDarkBg ? '#FFFFFF' : '#000000', fontWeight: 900 }}
+        >
+          {inner}
         </strong>
       );
     }
