@@ -30,6 +30,7 @@ import { safeSetStorage, safeGetStorage } from './utils/safeStorage';
 import { TrendingUp, ExternalLink, ChevronLeft, ChevronRight, ArrowRight, BookOpen, Feather, BarChart2, MessageSquare, Briefcase, Newspaper, Clock } from 'lucide-react';
 import { INITIAL_ARTICLES, INITIAL_TICKERS, INITIAL_ADS } from './data/mockData';
 import { getUIText, translateArticleData, translateCategory } from './utils/translations';
+import { getArticleIdentifierFromUrl } from './utils/shareUtils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -104,7 +105,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSelectArticle = (art: Article) => {
+  const handleSelectArticle = (art: Article, updateHistory = true) => {
     const isSubscriberArticle = Boolean(art.is_subscription_only || art.is_premium);
 
     // CRITICAL: The subscription modal ONLY pops up if an unsubscribed reader clicks a "Subscribed tagged story"
@@ -117,8 +118,74 @@ export default function App() {
 
     // Free stories or authenticated subscribers open directly with NO modal popup
     setSelectedArticle(art);
+
+    if (updateHistory && typeof window !== 'undefined') {
+      const shareUrl = `/?article=${encodeURIComponent(art.slug || art.article_id)}`;
+      window.history.pushState({ articleId: art.article_id, slug: art.slug }, '', shareUrl);
+    }
+    if (typeof document !== 'undefined') {
+      document.title = `${art.title} - EconMatrix`;
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleCloseArticle = () => {
+    setSelectedArticle(null);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', window.location.pathname);
+    }
+    if (typeof document !== 'undefined') {
+      document.title = 'Econ Matrix - Financial & Economic Intelligence';
+    }
+  };
+
+  // Handle Deep Linking (?article=..., ?story=..., /story/:slug) on load and popstate
+  useEffect(() => {
+    const handleUrlNavigation = async () => {
+      const param = getArticleIdentifierFromUrl();
+      if (!param) {
+        if (selectedArticle) {
+          setSelectedArticle(null);
+        }
+        return;
+      }
+
+      // Check in-memory articles first
+      const found = articles.find(
+        (a) =>
+          String(a.article_id) === param ||
+          a.slug === param ||
+          (a.slug && a.slug.toLowerCase() === param.toLowerCase())
+      );
+
+      if (found) {
+        handleSelectArticle(found, false);
+        return;
+      }
+
+      // If not in current articles list, fetch from server API
+      try {
+        const res = await fetch(`/api/articles/${encodeURIComponent(param)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && data.article) {
+            handleSelectArticle(data.article, false);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load shared article from URL:', err);
+      }
+    };
+
+    handleUrlNavigation();
+
+    const onPopState = () => {
+      handleUrlNavigation();
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [articles]);
 
   const handleOpenIgStory = (art: Article, mode: 'entire_story' | 'summary' = 'entire_story') => {
     if (mode === 'summary') {
@@ -339,7 +406,7 @@ export default function App() {
         {selectedArticle ? (
           <FullArticleView
             article={selectedArticle}
-            onBack={() => setSelectedArticle(null)}
+            onBack={handleCloseArticle}
             language={language}
             setLanguage={setLanguage}
             isLoggedIn={isLoggedIn}

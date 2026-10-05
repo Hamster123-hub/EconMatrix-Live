@@ -7096,12 +7096,112 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
     res.json({ success: true, message: 'Stripe Webhook processed & posted to Automated Accounting Ledger.', txRef });
   });
 
+  function getArticleForRequest(req: express.Request) {
+    const articleParam =
+      (req.query.article as string) ||
+      (req.query.story as string) ||
+      (req.query.id as string);
+
+    let identifier = articleParam ? articleParam.trim() : null;
+
+    if (!identifier) {
+      const match = req.path.match(/^\/(?:story|article)\/([^/?#]+)/i);
+      if (match && match[1]) {
+        identifier = decodeURIComponent(match[1].trim());
+      }
+    }
+
+    if (!identifier) return null;
+
+    return articlesStore.find(
+      (a) =>
+        String(a.article_id) === identifier ||
+        a.slug === identifier ||
+        (a.slug && a.slug.toLowerCase() === identifier.toLowerCase())
+    );
+  }
+
+  function injectArticleMetaTags(html: string, article: Article, req: express.Request): string {
+    const host = req.get('host') || 'econmatrix.lk';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const canonicalUrl = `${protocol}://${host}/?article=${encodeURIComponent(article.slug || article.article_id)}`;
+
+    const safeTitle = (article.title || 'Econ Matrix News')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const rawDeck = article.deck || article.title;
+    const safeDesc = (rawDeck.length > 200 ? rawDeck.slice(0, 197) + '...' : rawDeck)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    let safeImage = article.featured_image_url || 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
+    if (safeImage.startsWith('/')) {
+      safeImage = `${protocol}://${host}${safeImage}`;
+    }
+
+    let modified = html;
+    modified = modified.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle} - Econ Matrix</title>`);
+    if (/<meta\s+name=["']description["'][^>]*>/i.test(modified)) {
+      modified = modified.replace(/<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${safeDesc}" />`);
+    }
+
+    modified = modified.replace(/<meta\s+property=["']og:[^"']+["'][^>]*>/gi, '');
+    modified = modified.replace(/<meta\s+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+
+    const ogTags = `
+    <!-- Dynamic OpenGraph & WhatsApp Social Share Cards -->
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Econ Matrix" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDesc}" />
+    <meta property="og:image" content="${safeImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="${canonicalUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${safeTitle}" />
+    <meta name="twitter:description" content="${safeDesc}" />
+    <meta name="twitter:image" content="${safeImage}" />
+  </head>`;
+
+    modified = modified.replace(/<\/head>/i, ogTags);
+    return modified;
+  }
+
   // Vite middleware or static serving
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
+
+    // Crawler / Social Share card interceptor for dev & live testing
+    app.use(async (req, res, next) => {
+      const userAgent = req.get('user-agent') || '';
+      const isCrawler = /WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot/i.test(userAgent);
+      const article = getArticleForRequest(req);
+
+      if (article && (isCrawler || req.query.crawler === 'true')) {
+        const indexPath = path.join(process.cwd(), 'index.html');
+        if (fs.existsSync(indexPath)) {
+          let rawHtml = fs.readFileSync(indexPath, 'utf-8');
+          try {
+            rawHtml = await vite.transformIndexHtml(req.originalUrl, rawHtml);
+          } catch {}
+          const modified = injectArticleMetaTags(rawHtml, article, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.send(modified);
+          return;
+        }
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
@@ -7117,7 +7217,16 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
     app.get('*', (req, res) => {
       // Prevent stale index.html caching so new deployments appear immediately
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.sendFile(path.join(distPath, 'index.html'));
+      const article = getArticleForRequest(req);
+      const indexPath = path.join(distPath, 'index.html');
+      if (article && fs.existsSync(indexPath)) {
+        const rawHtml = fs.readFileSync(indexPath, 'utf-8');
+        const modified = injectArticleMetaTags(rawHtml, article, req);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(modified);
+        return;
+      }
+      res.sendFile(indexPath);
     });
   }
 

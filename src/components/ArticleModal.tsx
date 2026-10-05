@@ -18,6 +18,12 @@ import {
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
 import { renderArticleParagraph } from '../utils/articleRenderer';
+import {
+  getWhatsAppShareUrl,
+  getTwitterShareUrl,
+  copyArticleShareUrl,
+  shareArticleNativeOrCopy,
+} from '../utils/shareUtils';
 
 interface ArticleModalProps {
   article: Article | null;
@@ -199,10 +205,26 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+  const handleCopyLink = async () => {
+    if (!article) return;
+    const success = await copyArticleShareUrl({ article_id: article.article_id, slug: article.slug });
+    if (success) {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!article) return;
+    const res = await shareArticleNativeOrCopy({
+      article_id: article.article_id,
+      slug: article.slug,
+      title: displayTitle,
+    });
+    if (res === 'copied') {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   const handleSubscribeNow = (e: React.FormEvent) => {
@@ -273,12 +295,12 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
 
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleCopyLink}
+                onClick={handleNativeShare}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-sm text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                 title="Share"
               >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>{copiedLink ? 'Copied' : 'Share'}</span>
+                <Share2 className="w-3.5 h-3.5 text-[#0284C7]" />
+                <span>{copiedLink ? 'Link Copied' : 'Share'}</span>
               </button>
               <button
                 onClick={() => window.print()}
@@ -370,20 +392,28 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               </span>
               
               <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(displayTitle + ' ' + window.location.href)}`}
+                href={getWhatsAppShareUrl({
+                  article_id: article.article_id,
+                  slug: article.slug,
+                  title: displayTitle,
+                })}
                 target="_blank"
-                rel="noreferrer"
-                className="w-7 h-7 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer"
+                rel="noopener noreferrer"
+                className="w-7 h-7 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
                 title="Share on WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 fill-current" />
               </a>
 
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(displayTitle)}&url=${encodeURIComponent(window.location.href)}`}
+                href={getTwitterShareUrl({
+                  article_id: article.article_id,
+                  slug: article.slug,
+                  title: displayTitle,
+                })}
                 target="_blank"
-                rel="noreferrer"
-                className="w-7 h-7 rounded-sm bg-sky-100 hover:bg-sky-200 text-sky-800 flex items-center justify-center transition cursor-pointer"
+                rel="noopener noreferrer"
+                className="w-7 h-7 rounded-sm bg-sky-100 hover:bg-sky-200 text-sky-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
                 title="Share on X"
               >
                 <Twitter className="w-3.5 h-3.5" />
@@ -394,7 +424,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-sm text-xs font-bold font-mono flex items-center gap-1 transition cursor-pointer"
                 title="Copy Link"
               >
-                {copiedLink ? <Check className="w-3 h-3 text-emerald-500" /> : <Share2 className="w-3 h-3" />}
+                {copiedLink ? <Check className="w-3 h-3 text-emerald-600" /> : <Share2 className="w-3 h-3" />}
                 <span>{copiedLink ? 'Copied' : 'Copy'}</span>
               </button>
             </div>

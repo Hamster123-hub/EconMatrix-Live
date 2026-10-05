@@ -16,10 +16,18 @@ import {
   Moon, 
   Sun, 
   ChevronUp,
-  Printer
+  Printer,
+  Copy
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
 import { renderArticleParagraph } from '../utils/articleRenderer';
+import {
+  getArticleShareUrl,
+  getWhatsAppShareUrl,
+  getTwitterShareUrl,
+  copyArticleShareUrl,
+  shareArticleNativeOrCopy,
+} from '../utils/shareUtils';
 
 interface FullArticleViewProps {
   article: Article;
@@ -223,10 +231,24 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+  const handleCopyLink = async () => {
+    const success = await copyArticleShareUrl({ article_id: article.article_id, slug: article.slug });
+    if (success) {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    const res = await shareArticleNativeOrCopy({
+      article_id: article.article_id,
+      slug: article.slug,
+      title: displayTitle,
+    });
+    if (res === 'copied') {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -427,7 +449,7 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
 
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleCopyLink}
+              onClick={handleNativeShare}
               className={`px-3 py-1.5 rounded-sm text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
                 isNightReader ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
@@ -538,20 +560,28 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
             </span>
             
             <a
-              href={`https://api.whatsapp.com/send?text=${encodeURIComponent(displayTitle + ' ' + window.location.href)}`}
+              href={getWhatsAppShareUrl({
+                article_id: article.article_id,
+                slug: article.slug,
+                title: displayTitle,
+              })}
               target="_blank"
-              rel="noreferrer"
-              className="w-8 h-8 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer"
+              rel="noopener noreferrer"
+              className="w-8 h-8 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
               title="Share on WhatsApp"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
             </a>
 
             <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(displayTitle)}&url=${encodeURIComponent(window.location.href)}`}
+              href={getTwitterShareUrl({
+                article_id: article.article_id,
+                slug: article.slug,
+                title: displayTitle,
+              })}
               target="_blank"
-              rel="noreferrer"
-              className="w-8 h-8 rounded-sm bg-sky-100 hover:bg-sky-200 text-sky-800 flex items-center justify-center transition cursor-pointer"
+              rel="noopener noreferrer"
+              className="w-8 h-8 rounded-sm bg-sky-100 hover:bg-sky-200 text-sky-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
               title="Share on X"
             >
               <Twitter className="w-4 h-4" />
@@ -564,8 +594,8 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
               }`}
               title="Copy Article Link"
             >
-              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5" />}
-              <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
+              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedLink ? 'Copied Link' : 'Copy Link'}</span>
             </button>
           </div>
         </div>
