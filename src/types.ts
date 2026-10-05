@@ -95,6 +95,8 @@ export interface Article {
   notable_position?: 'left' | 'right' | 'none';
   is_notable?: boolean;
   is_spotlight?: boolean;
+  last_edited_by?: string;
+  last_edited_at?: string;
 }
 
 export interface StockTicker {

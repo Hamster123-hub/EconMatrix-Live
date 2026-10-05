@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { FormattedText } from './FormattedText';
 import { HyperlinkModal } from './HyperlinkModal';
+import { RichArticleEditor } from './RichArticleEditor';
 
 interface StoryEditorPageProps {
   article: any;
@@ -508,101 +509,21 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                     <FileText className="w-3.5 h-3.5 text-[#0284C7]" />
                     <span>Article Body & Full Dispatch *</span>
                   </label>
-
-                  {/* Formatting Quick Insert Buttons */}
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleFormatSelection('**', '**', 'Bold Subheading / Text')}
-                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black border border-amber-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition active:scale-95"
-                      title="Highlight text to make BOLD (Ctrl+B) - perfect for section subheadings and key phrases"
-                    >
-                      <Bold className="w-3.5 h-3.5 text-amber-800 stroke-[3]" />
-                      <span>Bold (Ctrl+B)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleFormatSelection('*', '*', 'Italic text')}
-                      className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold italic border border-emerald-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition active:scale-95"
-                      title="Highlight text to make ITALIC (Ctrl+I)"
-                    >
-                      <Italic className="w-3.5 h-3.5 text-emerald-700 stroke-[2.5]" />
-                      <span>Italics (Ctrl+I)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenLinkModal}
-                      className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-900 font-extrabold border border-sky-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition active:scale-95"
-                      title="Highlight any word and click to attach a document link / hyperlink (Ctrl+K)"
-                    >
-                      <Link2 className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Add Hyperlink / Document</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInsertText('### Section Sub-Heading')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-xs flex items-center gap-1 cursor-pointer"
-                      title="Insert Subheading"
-                    >
-                      <Heading className="w-3 h-3 text-slate-600" />
-                      <span>H3 Subheading</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInsertText('> "Insert prominent expert quote or Central Bank statement here."')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-xs flex items-center gap-1 cursor-pointer"
-                      title="Insert Pull Quote"
-                    >
-                      <Quote className="w-3 h-3 text-sky-600" />
-                      <span>Pull Quote</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleInsertText('- **Indicator 1:** Value\n- **Indicator 2:** Value\n- **Indicator 3:** Value')}
-                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-xs flex items-center gap-1 cursor-pointer"
-                      title="Insert Bullet List"
-                    >
-                      <List className="w-3 h-3 text-amber-600" />
-                      <span>Bullet Points</span>
-                    </button>
-                  </div>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Highlight words and click <strong className="text-amber-900">Bold (Ctrl+B)</strong> to make text darker (zero stars on sides)
+                  </span>
                 </div>
 
-                <div className="relative">
-                  <textarea
-                    ref={bodyTextareaRef}
-                    rows={18}
-                    required
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.ctrlKey || e.metaKey) {
-                        if (e.key.toLowerCase() === 'b') {
-                          e.preventDefault();
-                          handleFormatSelection('**', '**', 'Bold Subheading / Text');
-                        } else if (e.key.toLowerCase() === 'i') {
-                          e.preventDefault();
-                          handleFormatSelection('*', '*', 'Italic text');
-                        } else if (e.key.toLowerCase() === 'k') {
-                          e.preventDefault();
-                          handleOpenLinkModal();
-                        }
-                      }
-                    }}
-                    placeholder="Draft or edit the complete story analysis here. Highlight any word and click 'Bold' or 'Italics' to format text, or 'Add Hyperlink' to link an important document, PDF, or website."
-                    className="w-full text-sm font-serif leading-relaxed text-slate-900 border border-slate-300 p-4 focus:border-[#0284C7] focus:bg-sky-50/10 outline-none transition selection:bg-sky-200"
-                  />
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 px-3 py-1.5 border-x border-b border-slate-200 font-mono">
-                    <span className="flex items-center gap-1.5 flex-wrap">
-                      <span>💡 <strong>Formatting Shortcuts:</strong></span>
-                      <span className="text-amber-800 font-bold">Ctrl+B for <strong>Bold</strong></span>
-                      <span>•</span>
-                      <span className="text-emerald-800 font-bold">Ctrl+I for <em>Italics</em></span>
-                      <span>•</span>
-                      <span className="text-sky-800 font-bold">Ctrl+K for <u>Hyperlink/Doc</u></span>
-                    </span>
-                  </div>
-                </div>
+                <RichArticleEditor
+                  value={body}
+                  onChange={(val) => {
+                    setBody(val);
+                    setHasUnsavedChanges(true);
+                  }}
+                  required
+                  placeholder="Draft or edit the complete story analysis here. Highlight any word and click 'Bold' (Ctrl+B) or 'Italics' (Ctrl+I) to format text, or 'Add Link' to attach an important document, PDF, or website."
+                  minHeight="420px"
+                />
 
                 {/* Article Statistics Counter Bar */}
                 <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 pt-2 border-t border-slate-100 font-mono">

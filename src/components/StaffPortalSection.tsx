@@ -8,6 +8,7 @@ import { AdDeskBackendPortal } from './AdDeskBackendPortal';
 import { StoryEditorPage } from './StoryEditorPage';
 import { ImageDatabaseBackendSection } from './ImageDatabaseBackendSection';
 import { HyperlinkModal } from './HyperlinkModal';
+import { RichArticleEditor } from './RichArticleEditor';
 
 interface StaffPortalSectionProps {
   isLoggedIn: boolean;
@@ -2333,98 +2334,23 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
             </div>
 
             <div>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <label className="text-slate-800 font-extrabold text-sm flex items-center gap-1.5 mr-2">
-                    <span>Full Article Body *</span>
-                    <span className="text-xs text-slate-400 font-normal">(Editorial Writing Area)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleStaffFormatSelection('**', '**', 'Bold Subheading / Text')}
-                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-black border border-amber-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition text-xs active:scale-95"
-                    title="Highlight text to make BOLD (Ctrl+B) - perfect for section subheadings and emphasis"
-                  >
-                    <Bold className="w-3.5 h-3.5 text-amber-800 stroke-[3]" />
-                    <span>Bold (Ctrl+B)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleStaffFormatSelection('*', '*', 'Italic text')}
-                    className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold italic border border-emerald-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition text-xs active:scale-95"
-                    title="Highlight text to make ITALIC (Ctrl+I)"
-                  >
-                    <Italic className="w-3.5 h-3.5 text-emerald-700 stroke-[2.5]" />
-                    <span>Italics (Ctrl+I)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleStaffFormatSelection('\n\n### ', '\n', 'Section Subheading')}
-                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold border border-slate-300 rounded-xs flex items-center gap-1 cursor-pointer shadow-2xs transition text-xs active:scale-95"
-                    title="Insert Subheading"
-                  >
-                    <Heading className="w-3.5 h-3.5 text-slate-700" />
-                    <span>H3 Subheading</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenStaffLinkModal}
-                    className="px-2.5 py-1 bg-sky-50 hover:bg-sky-100 text-sky-900 font-extrabold border border-sky-300 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition text-xs active:scale-95"
-                    title="Highlight any word or phrase and click to attach a document link / hyperlink (Ctrl+K)"
-                  >
-                    <Link2 className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Add Hyperlink / Document</span>
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-mono">
-                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-xs border border-slate-300 font-bold">
-                    {storyBody ? `${storyBody.trim().split(/\s+/).filter(Boolean).length} words` : '0 words'}
-                  </span>
-                  <span className="text-slate-400">
-                    {storyBody ? `${storyBody.length} chars` : '0 chars'}
-                  </span>
-                  {storyBody && storyBody.trim().split(/\s+/).filter(Boolean).length > 100 && (
-                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-xs font-bold border border-amber-300">
-                      Long Story • Summary Option Available for IG
-                    </span>
-                  )}
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label className="text-slate-800 font-extrabold text-sm flex items-center gap-1.5">
+                  <span>Full Article Body *</span>
+                  <span className="text-xs text-slate-400 font-normal">(Editorial Writing Area)</span>
+                </label>
+                <span className="text-[11px] text-slate-500 font-mono">
+                  Highlight words and click <strong className="text-amber-900">Bold (Ctrl+B)</strong> to make text darker (zero stars on sides)
+                </span>
               </div>
-              <div className="relative">
-                <textarea
-                  ref={staffBodyTextareaRef}
-                  required
-                  rows={15}
-                  value={storyBody}
-                  onChange={(e) => setStoryBody(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.ctrlKey || e.metaKey) {
-                      if (e.key.toLowerCase() === 'b') {
-                        e.preventDefault();
-                        handleStaffFormatSelection('**', '**', 'Bold Subheading / Text');
-                      } else if (e.key.toLowerCase() === 'i') {
-                        e.preventDefault();
-                        handleStaffFormatSelection('*', '*', 'Italic text');
-                      } else if (e.key.toLowerCase() === 'k') {
-                        e.preventDefault();
-                        handleOpenStaffLinkModal();
-                      }
-                    }
-                  }}
-                  placeholder="Write or paste full news text here... Highlight any word and click 'Bold' or 'Italics' to format text, or 'Add Hyperlink' to link an important document, PDF, or website."
-                  className="w-full min-h-[360px] md:min-h-[460px] bg-slate-50 focus:bg-white border-2 border-slate-300 focus:border-[#0284C7] p-4 text-sm leading-relaxed text-slate-900 rounded-xs shadow-inner outline-none transition font-sans resize-y selection:bg-sky-200"
-                />
-                <div className="flex items-center justify-between text-[11px] text-slate-500 bg-slate-100 px-3 py-1.5 border-x border-b border-slate-300 font-mono">
-                  <span className="flex items-center gap-1.5 flex-wrap">
-                    <span>💡 <strong>Formatting Shortcuts:</strong></span>
-                    <span className="text-amber-800 font-bold">Ctrl+B for <strong>Bold</strong></span>
-                    <span>•</span>
-                    <span className="text-emerald-800 font-bold">Ctrl+I for <em>Italics</em></span>
-                    <span>•</span>
-                    <span className="text-sky-800 font-bold">Ctrl+K for <u>Hyperlink/Doc</u></span>
-                  </span>
-                </div>
-              </div>
+
+              <RichArticleEditor
+                value={storyBody}
+                onChange={setStoryBody}
+                required
+                placeholder="Write or paste full news text here... Highlight any word and click 'Bold' or 'Italics' to format text, or 'Add Link' to attach an important document, PDF, or website."
+                minHeight="420px"
+              />
               <div className="flex flex-wrap items-center justify-between gap-2 mt-1.5 text-xs text-slate-500">
                 <p className="flex items-center gap-1">
                   <span>💡 Tip: Drag the bottom-right corner of the writing box to expand it even further.</span>

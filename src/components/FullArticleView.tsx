@@ -110,9 +110,19 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
   const displayBody = translatedArticle.body || article.body;
 
   // Format body text into readable paragraphs
-  const paragraphs = displayBody
-    ? displayBody.split('\n\n').filter((p) => p.trim().length > 0)
-    : [displayDeck];
+  const paragraphs = (() => {
+    if (!displayBody) return [displayDeck || ''];
+    if (/<p[\s>]/i.test(displayBody)) {
+      const pMatches = displayBody.match(/<p\b[^>]*>([\s\S]*?)<\/p>/gi);
+      if (pMatches && pMatches.length > 0) {
+        return pMatches.map((p) => p.replace(/^<p\b[^>]*>|<\/p>$/gi, '').trim()).filter(Boolean);
+      }
+    }
+    return displayBody
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+  })();
 
   const getFormattedPublishDate = (dateStr?: string) => {
     const date = dateStr ? new Date(dateStr) : new Date();

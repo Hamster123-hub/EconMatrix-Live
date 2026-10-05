@@ -3,57 +3,70 @@ import { ExternalLink, FileText } from 'lucide-react';
 
 /**
  * Parses article text paragraphs to render rich formatting:
+ * - **bold** / ***bold*** / <b>bold</b> / <strong>bold</strong> -> Darker, punchy black bold text with ZERO stars on sides
+ * - *italic* / <i>italic</i> / <em>italic</em> -> Italicized text
  * - [Anchor Text](URL) -> Styled clickable document/hyperlink (opens in new tab)
- * - **bold** -> <strong>
- * - *italic* -> <em>
- * - `code` -> <code>
+ * - `code` -> Inline code badge
  * - Standalone URLs -> Clickable links
  */
 export const renderArticleParagraph = (text: string, isDarkBg = false): React.ReactNode => {
   if (!text) return null;
 
-  // Regex to match ***bold***, **bold**, *italic*, `code`, [text](url), <b>text</b>, <strong>text</strong>, or standalone URLs (https?://\S+)
-  const regex = /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\)|<b\b[^>]*>.*?<\/b>|<strong\b[^>]*>.*?<\/strong>|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
-  const parts = text.split(regex);
+  // 1. Pre-process to normalize all bold patterns (***word***, **word**, ** word **, *** 1,002,232 ***) into <b>...</b>
+  let processed = text.replace(/\*{2,4}\s*([\s\S]+?)\s*\*{2,4}/g, (_match, inner) => {
+    const clean = inner.replace(/^\*+|\*+$/g, '').trim();
+    return `<b>${clean}</b>`;
+  });
+
+  // 2. Pre-process single-star italic patterns (*word*, * word *) into <i>...</i>
+  processed = processed.replace(/(?<!\*)\*\s*([^\n*]+?)\s*\*(?!\*)/g, (_match, inner) => {
+    const clean = inner.replace(/^\*+|\*+$/g, '').trim();
+    return `<i>${clean}</i>`;
+  });
+
+  // 3. Strip any orphan/stray asterisks so no stars can ever show on the sides
+  processed = processed.replace(/\*{2,4}/g, '');
+
+  // 4. Split by formatting tokens
+  const regex = /(<b\b[^>]*>[\s\S]*?<\/b>|<strong\b[^>]*>[\s\S]*?<\/strong>|<i\b[^>]*>[\s\S]*?<\/i>|<em\b[^>]*>[\s\S]*?<\/em>|\[.*?\]\(.*?\)|\`[^\`]+\`|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
+  const parts = processed.split(regex);
 
   return parts.map((part, i) => {
     if (!part) return null;
 
-    // Bold ***text*** or **text**
-    if ((part.startsWith('***') && part.endsWith('***') && part.length >= 6) ||
-        (part.startsWith('**') && part.endsWith('**') && part.length >= 4)) {
-      const isTriple = part.startsWith('***');
-      const inner = isTriple ? part.slice(3, -3).trim() : part.slice(2, -2).trim();
+    // Bold tags <b>...</b> or <strong>...</strong>
+    // Styled to be noticeably darker (#000000, font-weight: 900, text stroke) with ZERO stars
+    if (/^<(b|strong)\b[^>]*>[\s\S]*?<\/\1>$/i.test(part)) {
+      const inner = part
+        .replace(/^<[^>]+>|<\/[^>]+>$/g, '')
+        .replace(/^\*+|\*+$/g, '')
+        .trim();
+
       return (
         <strong
           key={i}
           className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-white' : 'text-black'}`}
-          style={{ color: isDarkBg ? '#FFFFFF' : '#000000', fontWeight: 900 }}
+          style={{
+            color: isDarkBg ? '#FFFFFF' : '#000000',
+            fontWeight: 900,
+            WebkitTextStroke: isDarkBg ? '0.25px #FFFFFF' : '0.35px #000000',
+          }}
         >
           {inner}
         </strong>
       );
     }
 
-    // HTML <b>...</b> or <strong>...</strong>
-    if (/^<b\b[^>]*>(.*?)<\/b>$/i.test(part) || /^<strong\b[^>]*>(.*?)<\/strong>$/i.test(part)) {
-      const inner = part.replace(/^<[^>]+>|<\/[^>]+>$/g, '').trim();
-      return (
-        <strong
-          key={i}
-          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-white' : 'text-black'}`}
-          style={{ color: isDarkBg ? '#FFFFFF' : '#000000', fontWeight: 900 }}
-        >
-          {inner}
-        </strong>
-      );
-    }
+    // Italic tags <i>...</i> or <em>...</em>
+    if (/^<(i|em)\b[^>]*>[\s\S]*?<\/\1>$/i.test(part)) {
+      const inner = part
+        .replace(/^<[^>]+>|<\/[^>]+>$/g, '')
+        .replace(/^\*+|\*+$/g, '')
+        .trim();
 
-    // Italic *text*
-    if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**') && part.length >= 2) {
       return (
         <em key={i} className="italic font-serif">
-          {part.slice(1, -1)}
+          {inner}
         </em>
       );
     }
@@ -81,11 +94,12 @@ export const renderArticleParagraph = (text: string, isDarkBg = false): React.Re
         if (!linkUrl.startsWith('http://') && !linkUrl.startsWith('https://') && !linkUrl.startsWith('/') && !linkUrl.startsWith('#')) {
           linkUrl = 'https://' + linkUrl;
         }
-        const isDoc = linkUrl.toLowerCase().includes('.pdf') || 
-                      linkUrl.toLowerCase().includes('drive.google.com') || 
-                      linkUrl.toLowerCase().includes('docs.google.com') ||
-                      linkUrl.toLowerCase().includes('dropbox.com') ||
-                      linkUrl.toLowerCase().includes('box.com');
+        const isDoc =
+          linkUrl.toLowerCase().includes('.pdf') ||
+          linkUrl.toLowerCase().includes('drive.google.com') ||
+          linkUrl.toLowerCase().includes('docs.google.com') ||
+          linkUrl.toLowerCase().includes('dropbox.com') ||
+          linkUrl.toLowerCase().includes('box.com');
 
         return (
           <a
@@ -130,6 +144,8 @@ export const renderArticleParagraph = (text: string, isDarkBg = false): React.Re
       );
     }
 
-    return part;
+    // Clean plain text: ensure no rogue asterisks remain on sides
+    const cleanText = part.replace(/\*{1,4}/g, '');
+    return cleanText;
   });
 };

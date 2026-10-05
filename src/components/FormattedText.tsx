@@ -4,6 +4,7 @@ import { sanitizeAndFormatBookText, formatMathExpression } from '../utils/bookTe
 
 interface FormattedTextProps {
   content?: string;
+  text?: string;
   googleDocUrl?: string;
   className?: string;
   isDarkBg?: boolean;
@@ -19,47 +20,59 @@ export const extractGoogleDocId = (urlStr: string): string | null => {
 // Helper to parse inline markdown (***bold***, **bold**, *italic*, `code`, $math$, [link](url))
 const renderInlineMarkdown = (text: string, isDarkBg = false): React.ReactNode[] => {
   if (!text) return [];
-  
-  // Regex to match ***bold***, **bold**, *italic*, `code`, $math$, [text](url), <b>text</b>, <strong>text</strong>
-  const regex = /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|`.*?`|\$.*?\$|\[.*?\]\(.*?\)|<b\b[^>]*>.*?<\/b>|<strong\b[^>]*>.*?<\/strong>)/gi;
-  const parts = text.split(regex);
+
+  // 1. Pre-process to normalize all bold patterns (***word***, **word**, ** word **, *** 1,002,232 ***) into <b>...</b>
+  let processed = text.replace(/\*{2,4}\s*([\s\S]+?)\s*\*{2,4}/g, (_match, inner) => {
+    const clean = inner.replace(/^\*+|\*+$/g, '').trim();
+    return `<b>${clean}</b>`;
+  });
+
+  // 2. Pre-process single-star italic patterns (*word*, * word *) into <i>...</i>
+  processed = processed.replace(/(?<!\*)\*\s*([^\n*]+?)\s*\*(?!\*)/g, (_match, inner) => {
+    const clean = inner.replace(/^\*+|\*+$/g, '').trim();
+    return `<i>${clean}</i>`;
+  });
+
+  // 3. Strip any orphan/stray asterisks so no stars can ever show on the sides
+  processed = processed.replace(/\*{2,4}/g, '');
+
+  // 4. Split by formatting tokens
+  const regex = /(<b\b[^>]*>[\s\S]*?<\/b>|<strong\b[^>]*>[\s\S]*?<\/strong>|<i\b[^>]*>[\s\S]*?<\/i>|<em\b[^>]*>[\s\S]*?<\/em>|`.*?`|\$.*?\$|\[.*?\]\(.*?\))/gi;
+  const parts = processed.split(regex);
 
   return parts.map((part, i) => {
     if (!part) return null;
 
-    // Bold ***text*** or **text**
-    if ((part.startsWith('***') && part.endsWith('***') && part.length >= 6) ||
-        (part.startsWith('**') && part.endsWith('**') && part.length >= 4)) {
-      const isTriple = part.startsWith('***');
-      const inner = isTriple ? part.slice(3, -3).trim() : part.slice(2, -2).trim();
+    // Bold tags <b>...</b> or <strong>...</strong>
+    // Styled to be noticeably darker (#000000, font-weight: 900, text stroke) with ZERO stars
+    if (/^<(b|strong)\b[^>]*>[\s\S]*?<\/\1>$/i.test(part)) {
+      const inner = part
+        .replace(/^<[^>]+>|<\/[^>]+>$/g, '')
+        .replace(/^\*+|\*+$/g, '')
+        .trim();
+
       return (
         <strong
           key={i}
           className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-black'}`}
-          style={{ color: isDarkBg ? undefined : '#000000', fontWeight: 900 }}
+          style={{
+            color: isDarkBg ? undefined : '#000000',
+            fontWeight: 900,
+            WebkitTextStroke: isDarkBg ? '0.2px #FCD34D' : '0.35px #000000',
+          }}
         >
           {inner}
         </strong>
       );
     }
 
-    // HTML <b>...</b> or <strong>...</strong>
-    if (/^<b\b[^>]*>(.*?)<\/b>$/i.test(part) || /^<strong\b[^>]*>(.*?)<\/strong>$/i.test(part)) {
-      const inner = part.replace(/^<[^>]+>|<\/[^>]+>$/g, '').trim();
-      return (
-        <strong
-          key={i}
-          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-black'}`}
-          style={{ color: isDarkBg ? undefined : '#000000', fontWeight: 900 }}
-        >
-          {inner}
-        </strong>
-      );
-    }
+    // Italic tags <i>...</i> or <em>...</em>
+    if (/^<(i|em)\b[^>]*>[\s\S]*?<\/\1>$/i.test(part)) {
+      const inner = part
+        .replace(/^<[^>]+>|<\/[^>]+>$/g, '')
+        .replace(/^\*+|\*+$/g, '')
+        .trim();
 
-    // Italic *text*
-    if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**') && part.length >= 2) {
-      const inner = part.slice(1, -1);
       return (
         <em key={i} className="italic font-serif">
           {inner}
@@ -180,14 +193,16 @@ const renderMarkdownTable = (lines: string[], blockIdx: number, isDarkBg = false
 
 export const FormattedText: React.FC<FormattedTextProps> = ({
   content = '',
+  text = '',
   googleDocUrl,
   className = '',
   isDarkBg = false,
 }) => {
+  const resolvedContent = content || text || '';
   const [embedMode, setEmbedMode] = React.useState<'preview' | 'pub'>('preview');
 
   // Priority 1: Check if explicit or embedded Google Doc URL is provided
-  const detectedDocUrl = googleDocUrl || (content.includes('docs.google.com/document/d/') ? (content.match(/https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+[^\s<"]*/)?.[0]) : null);
+  const detectedDocUrl = googleDocUrl || (resolvedContent.includes('docs.google.com/document/d/') ? (resolvedContent.match(/https?:\/\/docs\.google\.com\/document\/d\/[a-zA-Z0-9_-]+[^\s<"]*/)?.[0]) : null);
   const docId = detectedDocUrl ? extractGoogleDocId(detectedDocUrl) : null;
 
   // Generate appropriate iframe src URL based on selected mode
@@ -199,17 +214,17 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
   };
 
   // Priority 2: Check if content is raw or pasted HTML (contains HTML tags like <table, <p>, <b>, <h3>, <ul>, <li>, etc.)
-  const isHtmlContent = /<[a-z][\s\S]*>/i.test(content) && (
-    content.includes('<table') ||
-    content.includes('<div') ||
-    content.includes('<p>') ||
-    content.includes('<p ') ||
-    content.includes('<h') ||
-    content.includes('<ul') ||
-    content.includes('<ol') ||
-    content.includes('<li') ||
-    content.includes('<strong') ||
-    content.includes('<b')
+  const isHtmlContent = /<[a-z][\s\S]*>/i.test(resolvedContent) && (
+    resolvedContent.includes('<table') ||
+    resolvedContent.includes('<div') ||
+    resolvedContent.includes('<p>') ||
+    resolvedContent.includes('<p ') ||
+    resolvedContent.includes('<h') ||
+    resolvedContent.includes('<ul') ||
+    resolvedContent.includes('<ol') ||
+    resolvedContent.includes('<li') ||
+    resolvedContent.includes('<strong') ||
+    resolvedContent.includes('<b')
   );
 
   return (
@@ -305,16 +320,16 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
             [&_th]:p-3 [&_th]:border [&_th]:border-slate-700 [&_th]:text-left
             [&_td]:p-3 [&_td]:border [&_td]:border-slate-300 [&_td]:text-slate-900
             [&_tr:nth-child(even)]:bg-slate-50 [&_tr:hover]:bg-amber-50/50`}
-          dangerouslySetInnerHTML={{ __html: content }}
+          dangerouslySetInnerHTML={{ __html: resolvedContent }}
         />
       ) : (
         /* MARKDOWN & TEXT BLOCK PARSER */
         (() => {
-          if (!content && !docId) return null;
-          if (!content && docId) return null; // Already rendered doc frame above
+          if (!resolvedContent && !docId) return null;
+          if (!resolvedContent && docId) return null; // Already rendered doc frame above
 
           // Sanitize and format book text (fixes headings, equations, and paragraph spacing)
-          const formattedText = sanitizeAndFormatBookText(content);
+          const formattedText = sanitizeAndFormatBookText(resolvedContent);
 
           // Split content into double-newline blocks
           const blocks = formattedText.split(/\n\s*\n/);
