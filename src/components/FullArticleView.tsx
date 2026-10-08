@@ -654,7 +654,7 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
 
         {/* 8. Full Formatted Article Body with Rich Inline Images & Side-by-Side Grids */}
         <div className={`space-y-6 font-sans ${getBodyFontSize()} ${
-          isNightReader ? 'text-slate-200' : 'text-slate-800'
+          isNightReader ? 'text-slate-200' : 'text-slate-700'
         }`}>
           {renderArticleBody(displayBody, isNightReader)}
         </div>

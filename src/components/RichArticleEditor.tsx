@@ -765,7 +765,7 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
             type="button"
             onClick={handleBoldClick}
             className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black border border-amber-400 rounded-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition active:scale-95"
-            title="Highlight words and click to make them DARKER & BOLD (Ctrl+B)"
+            title="Highlight words and click to make them BOLD (Ctrl+B)"
           >
             <Bold className="w-4 h-4 text-amber-950 stroke-[3]" />
             <span className="font-extrabold tracking-tight">Bold (Ctrl+B)</span>
@@ -902,9 +902,9 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
             onKeyDown={handleKeyDown}
             style={{ minHeight }}
             data-placeholder={placeholder}
-            className="w-full p-4 sm:p-5 text-[15px] sm:text-[16px] font-serif leading-relaxed text-slate-800 outline-none focus:bg-amber-50/5 transition overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:italic empty:before:pointer-events-none 
-              [&_b]:font-black [&_b]:text-black [&_b]:font-extrabold [&_b]:tracking-tight
-              [&_strong]:font-black [&_strong]:text-black [&_strong]:font-extrabold [&_strong]:tracking-tight
+            className="w-full p-4 sm:p-5 text-[15px] sm:text-[16px] font-serif leading-relaxed text-slate-700 outline-none focus:bg-amber-50/5 transition overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:italic empty:before:pointer-events-none 
+              [&_b]:font-bold [&_b]:text-slate-800 [&_b]:tracking-tight
+              [&_strong]:font-bold [&_strong]:text-slate-800 [&_strong]:tracking-tight
               [&_i]:italic [&_i]:font-serif
               [&_em]:italic [&_em]:font-serif
               [&_h3]:font-sans [&_h3]:font-black [&_h3]:text-lg [&_h3]:text-[#0B1E36] [&_h3]:mt-4 [&_h3]:mb-2

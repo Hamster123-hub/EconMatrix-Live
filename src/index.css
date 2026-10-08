@@ -20,6 +20,12 @@
   .font-mono {
     font-family: 'JetBrains Mono', 'Courier New', monospace;
   }
+
+  /* Refined Editorial Bold Tone: One tone lighter than pitch black (#000000/#0F172A), noticeably darker than body text (#334155) */
+  b, strong, .prose strong, .prose b, [contenteditable] b, [contenteditable] strong {
+    font-weight: 700;
+    color: #1E293B;
+  }
 }
 
 /* Custom Editorial Scrollbar */

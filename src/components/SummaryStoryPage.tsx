@@ -28,7 +28,11 @@ import {
   List,
   AlignLeft,
   Wand2,
+  Upload,
+  User,
 } from 'lucide-react';
+
+const LANKAECON_BRAND_EMBLEM_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%230B1E36"/><circle cx="50" cy="50" r="44" fill="none" stroke="%23EAB308" stroke-width="2.5"/><text x="50" y="58" font-size="34" font-family="sans-serif" font-weight="900" fill="%23FFFFFF" text-anchor="middle">LE</text><path d="M50 16 L53 23 L61 24 L55 29 L57 37 L50 33 L43 37 L45 29 L39 24 L47 23 Z" fill="%23EAB308"/></svg>`;
 import {
   extractPointsFromText,
   formatPointsToText,
@@ -135,6 +139,41 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
 
   // Theme Style
   const [storyStyle, setStoryStyle] = useState<'navy_gold' | 'deep_emerald' | 'executive_blue' | 'dark_editorial'>('navy_gold');
+
+  // Top Story Profile Circle Image state
+  const [circleAvatarUrl, setCircleAvatarUrl] = useState<string>(
+    initialArticle?.authors?.[0]?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+  );
+  const [circleAvatarMode, setCircleAvatarMode] = useState<'author' | 'upload' | 'brand' | 'monogram'>('author');
+  const [loadedAvatarImg, setLoadedAvatarImg] = useState<HTMLImageElement | null>(null);
+  const [customCircleInput, setCustomCircleInput] = useState<string>('');
+
+  useEffect(() => {
+    if (circleAvatarMode === 'monogram' || !circleAvatarUrl) {
+      setLoadedAvatarImg(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => setLoadedAvatarImg(img);
+    img.onerror = () => setLoadedAvatarImg(null);
+    img.src = circleAvatarUrl;
+  }, [circleAvatarUrl, circleAvatarMode]);
+
+  const handleUploadCircleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (uploadEvent) => {
+        const resultUrl = uploadEvent.target?.result as string;
+        if (resultUrl) {
+          setCircleAvatarUrl(resultUrl);
+          setCircleAvatarMode('upload');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Font scale preference (normal 30px clear, large 35px extra legible, extra_large 40px, compact 25px, auto)
   const [fontScaling, setFontScaling] = useState<'auto' | 'compact' | 'normal' | 'large' | 'extra_large'>('normal');
@@ -604,16 +643,36 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    ctx.fillStyle = palette.headerBg;
+    const avatarRadius = 32;
     ctx.beginPath();
-    ctx.arc(avatarX, avatarY, 32, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(avatarX, avatarY, avatarRadius, 0, Math.PI * 2);
+    ctx.closePath();
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 23px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('LE', avatarX, avatarY);
+    if (circleAvatarMode !== 'monogram' && loadedAvatarImg && loadedAvatarImg.complete && loadedAvatarImg.naturalWidth > 0) {
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = palette.headerBg;
+      ctx.fill();
+      const imgW = loadedAvatarImg.naturalWidth;
+      const imgH = loadedAvatarImg.naturalHeight;
+      const size = Math.min(imgW, imgH);
+      const sx = (imgW - size) / 2;
+      const sy = (imgH - size) / 2;
+      ctx.drawImage(
+        loadedAvatarImg,
+        sx, sy, size, size,
+        avatarX - avatarRadius, avatarY - avatarRadius, avatarRadius * 2, avatarRadius * 2
+      );
+      ctx.restore();
+    } else {
+      ctx.fillStyle = palette.headerBg;
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 23px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('LE', avatarX, avatarY);
+    }
     ctx.restore();
 
     // Handle & Verified Checkmark
@@ -988,6 +1047,8 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
     sectorTakeaway,
     storyStyle,
     fontScaling,
+    loadedAvatarImg,
+    circleAvatarMode,
   ]);
 
   // Redraw canvas whenever any field changes
@@ -1813,7 +1874,132 @@ export const SummaryStoryPage: React.FC<SummaryStoryPageProps> = ({
               />
             </div>
 
-            {/* 5. Theme Palette & Font Controls */}
+            {/* 5. Top Story Profile Circle Image / Avatar Customizer */}
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-0.5 flex items-center justify-center shrink-0 shadow-md">
+                    <div className="w-full h-full rounded-full bg-slate-950 overflow-hidden flex items-center justify-center">
+                      {circleAvatarMode === 'monogram' || !circleAvatarUrl ? (
+                        <span className="text-[11px] font-black text-amber-300">LE</span>
+                      ) : (
+                        <img src={circleAvatarUrl} alt="Circle avatar" className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">
+                      Top Story Profile Circle Image / Badge
+                    </h3>
+                    <p className="text-[10px] text-slate-400">
+                      Displays inside the rainbow circle at the top-left of the story card
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[9.5px] font-mono px-2 py-0.5 bg-slate-800 text-amber-300 border border-slate-700 uppercase font-bold">
+                  {circleAvatarMode.toUpperCase()}
+                </span>
+              </div>
+
+              {/* 4 Avatar Selection Options */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {/* 1. Upload Custom Photo */}
+                <label className={`p-2 border rounded-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center ${
+                  circleAvatarMode === 'upload'
+                    ? 'bg-[#0284C7] border-sky-400 text-white shadow-xs'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                }`}>
+                  <Upload className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="font-bold text-[10.5px]">Upload Photo</span>
+                  <span className="text-[9px] text-slate-400">From Laptop</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadCircleImage}
+                  />
+                </label>
+
+                {/* 2. Author Portrait */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const authorAvatar = initialArticle?.authors?.[0]?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+                    setCircleAvatarUrl(authorAvatar);
+                    setCircleAvatarMode('author');
+                  }}
+                  className={`p-2 border rounded-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center ${
+                    circleAvatarMode === 'author'
+                      ? 'bg-[#0284C7] border-sky-400 text-white shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 text-sky-300" />
+                  <span className="font-bold text-[10.5px]">Author Photo</span>
+                  <span className="text-[9px] text-slate-400">Desk Reporter</span>
+                </button>
+
+                {/* 3. Official Brand Crest */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCircleAvatarUrl(LANKAECON_BRAND_EMBLEM_SVG);
+                    setCircleAvatarMode('brand');
+                  }}
+                  className={`p-2 border rounded-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center ${
+                    circleAvatarMode === 'brand'
+                      ? 'bg-[#0284C7] border-sky-400 text-white shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="font-bold text-[10.5px]">LankaEcon Logo</span>
+                  <span className="text-[9px] text-slate-400">Official Seal</span>
+                </button>
+
+                {/* 4. Initials Monogram */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCircleAvatarMode('monogram');
+                  }}
+                  className={`p-2 border rounded-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center ${
+                    circleAvatarMode === 'monogram'
+                      ? 'bg-[#0284C7] border-sky-400 text-white shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <span className="font-mono font-black text-amber-300 text-xs">LE</span>
+                  <span className="font-bold text-[10.5px]">LE Monogram</span>
+                  <span className="text-[9px] text-slate-400">Gold Initials</span>
+                </button>
+              </div>
+
+              {/* URL input fallback */}
+              <div className="flex gap-2 pt-0.5">
+                <input
+                  type="text"
+                  placeholder="Or paste direct image URL (https://...)..."
+                  value={customCircleInput}
+                  onChange={(e) => setCustomCircleInput(e.target.value)}
+                  className="flex-1 bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-xs text-white rounded-xs focus:border-sky-400 outline-none font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customCircleInput.trim()) {
+                      setCircleAvatarUrl(customCircleInput.trim());
+                      setCircleAvatarMode('upload');
+                    }
+                  }}
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3 py-1.5 rounded-xs cursor-pointer"
+                >
+                  Apply URL
+                </button>
+              </div>
+            </div>
+
+            {/* 6. Theme Palette & Font Controls */}
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xs space-y-3">
               <h3 className="text-xs font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                 <Palette className="w-4 h-4 text-pink-400" />

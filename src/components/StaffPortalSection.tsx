@@ -2340,7 +2340,7 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
                   <span className="text-xs text-slate-400 font-normal">(Editorial Writing Area)</span>
                 </label>
                 <span className="text-[11px] text-slate-500 font-mono">
-                  Highlight words and click <strong className="text-amber-900">Bold (Ctrl+B)</strong> to make text darker (zero stars on sides)
+                  Highlight words and click <strong className="text-amber-900">Bold (Ctrl+B)</strong> to format text bold (zero stars on sides)
                 </span>
               </div>
 

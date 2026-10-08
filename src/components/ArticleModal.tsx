@@ -508,7 +508,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
               </form>
             </div>
           ) : (
-            <div className="space-y-5 font-sans text-[15px] sm:text-[16px] text-slate-800 leading-[1.75]">
+            <div className="space-y-5 font-sans text-[15px] sm:text-[16px] text-slate-700 leading-[1.75]">
               {renderArticleBody(displayBody, false)}
             </div>
           )}

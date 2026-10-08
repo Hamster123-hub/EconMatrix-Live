@@ -73,7 +73,7 @@ export const ImageZoomModal = ImageLightboxModal;
 
 /**
  * Parses article text paragraphs to render rich formatting:
- * - **bold** / ***bold*** / <b>bold</b> / <strong>bold</strong> -> Darker, punchy black bold text with ZERO stars on sides
+ * - **bold** / ***bold*** / <b>bold</b> / <strong>bold</strong> -> Refined bold text (#0F172A / text-slate-900, one tone lighter than pitch black and darker than body text) with ZERO stars on sides
  * - *italic* / <i>italic</i> / <em>italic</em> -> Italicized text
  * - [Anchor Text](URL) -> Styled clickable document/hyperlink (opens in new tab)
  * - `code` -> Inline code badge
@@ -114,11 +114,10 @@ export const renderArticleParagraph = (text: string, isDarkBg = false): React.Re
       return (
         <strong
           key={i}
-          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-white' : 'text-black'}`}
+          className={`font-bold tracking-tight ${isDarkBg ? 'text-slate-100' : 'text-slate-800'}`}
           style={{
-            color: isDarkBg ? '#FFFFFF' : '#000000',
-            fontWeight: 900,
-            WebkitTextStroke: isDarkBg ? '0.25px #FFFFFF' : '0.35px #000000',
+            color: isDarkBg ? '#F1F5F9' : '#1E293B',
+            fontWeight: 700,
           }}
         >
           {inner}

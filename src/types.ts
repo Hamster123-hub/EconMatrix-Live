@@ -6,6 +6,37 @@ export interface TreasuryYieldData {
   auctionDate: string;
 }
 
+export interface TreasuryAuctionItem {
+  tenorDays: number;
+  maturityLabel: string;
+  offeredMn: number;
+  bidsReceivedMn?: number;
+  acceptedMn: number;
+  wayrPercent: number;
+  previousWayrPercent?: number;
+  changeBps?: number;
+}
+
+export interface TreasuryBillAuctionReport {
+  auctionId: string;
+  auctionDate: string;
+  settlementDate?: string;
+  source: string;
+  isOfficialPdmo: boolean;
+  totalOfferedMn: number;
+  totalAcceptedMn: number;
+  totalBidsReceivedMn?: number;
+  bidToCoverRatio?: number;
+  currency: string;
+  items: TreasuryAuctionItem[];
+  headline: string;
+  headlineStorySlug?: string;
+  lastUpdated: string;
+  nextAuctionDate?: string;
+  status: 'OFFICIAL_SETTLED' | 'AUCTION_HELD' | 'SCHEDULED';
+  bulletinSummary?: string;
+}
+
 export interface ForexRateData {
   currency: string;
   code: string;
@@ -727,6 +758,40 @@ export interface SubscriberRecord {
   notifyWeeklyDigest?: boolean;
   notifyBreakingNews?: boolean;
   status?: 'active' | 'cancelled' | 'paused';
+}
+
+export interface TreasuryAuctionMaturity {
+  tenor: string;
+  code: string;
+  offered: number;
+  accepted: number;
+  wayr: number;
+  changeBps: number;
+  status?: string;
+}
+
+export interface TreasuryBondYield {
+  maturity: string;
+  benchmarkYield: number;
+  coupon?: string;
+  changeBps?: number;
+}
+
+export interface TreasuryAuctionData {
+  auctionDate: string;
+  auctionDateIso: string;
+  source: string;
+  sourceUrl: string;
+  isOfficial: boolean;
+  isLive: boolean;
+  status: string;
+  lastSyncTime: string;
+  nextAuctionDate?: string;
+  totalOffered: number;
+  totalAccepted: number;
+  unit: string;
+  maturities: TreasuryAuctionMaturity[];
+  treasuryBonds?: TreasuryBondYield[];
 }
 
 

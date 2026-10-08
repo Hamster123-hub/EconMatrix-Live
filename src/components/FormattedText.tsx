@@ -54,11 +54,10 @@ const renderInlineMarkdown = (text: string, isDarkBg = false): React.ReactNode[]
       return (
         <strong
           key={i}
-          className={`font-black font-extrabold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-black'}`}
+          className={`font-bold tracking-tight ${isDarkBg ? 'text-amber-300' : 'text-slate-800'}`}
           style={{
-            color: isDarkBg ? undefined : '#000000',
-            fontWeight: 900,
-            WebkitTextStroke: isDarkBg ? '0.2px #FCD34D' : '0.35px #000000',
+            color: isDarkBg ? undefined : '#1E293B',
+            fontWeight: 700,
           }}
         >
           {inner}
@@ -311,8 +310,8 @@ export const FormattedText: React.FC<FormattedTextProps> = ({
             [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_ul]:space-y-1.5 [&_ul]:text-sm [&_ul]:sm:text-base
             [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ol]:space-y-1.5 [&_ol]:text-sm [&_ol]:sm:text-base
             [&_li]:leading-relaxed [&_li]:my-1
-            [&_strong]:font-black [&_strong]:text-black [&_strong]:font-extrabold
-            [&_b]:font-black [&_b]:text-black [&_b]:font-extrabold
+            [&_strong]:font-bold [&_strong]:text-slate-800
+            [&_b]:font-bold [&_b]:text-slate-800
             [&_em]:italic [&_em]:font-serif
             [&_blockquote]:my-4 [&_blockquote]:p-4 [&_blockquote]:border-l-4 [&_blockquote]:border-amber-600 [&_blockquote]:bg-amber-50/80 [&_blockquote]:rounded-xs [&_blockquote]:italic [&_blockquote]:font-serif
             [&_table]:w-full [&_table]:border-2 [&_table]:border-[#0B1E36] [&_table]:my-5 [&_table]:rounded-xs [&_table]:shadow-md [&_table]:border-collapse
