@@ -14,12 +14,14 @@ import {
   Printer,
   MessageCircle,
   Twitter,
-  Check
+  Check,
+  ZoomIn
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
-import { renderArticleParagraph } from '../utils/articleRenderer';
+import { renderArticleParagraph, renderArticleBody, ImageZoomModal } from '../utils/articleRenderer';
 import {
   getWhatsAppShareUrl,
+  openWhatsAppShare,
   getTwitterShareUrl,
   copyArticleShareUrl,
   shareArticleNativeOrCopy,
@@ -49,6 +51,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
   const [showSubscriptionSuccess, setShowSubscriptionSuccess] = useState(false);
   const [hasSubscribed, setHasSubscribed] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
 
   // Tiny Heart & AI Summary states
   const [likesCount, setLikesCount] = useState(article?.likes_count || (article ? Math.floor(25 + (article.article_id * 17) % 350) : 0));
@@ -312,18 +315,28 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Featured Cover Image (Smaller & Compact) */}
+          {/* 4. Featured Cover Image */}
           {article.featured_image_url && (
-            <figure className="space-y-1.5 max-w-[540px] mx-auto">
-              <div className="w-full max-h-[220px] sm:max-h-[240px] overflow-hidden rounded-sm border border-slate-200 bg-slate-100">
+            <figure className="space-y-2 w-full mx-auto group">
+              <div
+                onClick={() => setIsImageZoomOpen(true)}
+                className="w-full overflow-hidden rounded-sm border border-slate-200 bg-slate-50 cursor-pointer relative transition-all flex items-center justify-center"
+                title="Click to view full-resolution photo"
+              >
                 <img
                   src={article.featured_image_url}
                   alt={displayTitle}
-                  className="w-full h-[180px] sm:h-[220px] object-cover"
+                  className="w-full h-auto max-h-[500px] md:max-h-[560px] object-contain mx-auto"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center pointer-events-none">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-sm shadow-md flex items-center gap-1.5 font-mono">
+                    <ZoomIn className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Enlarge Full Size</span>
+                  </span>
+                </div>
               </div>
               {article.image_caption && article.image_caption.trim() && !article.image_caption.toLowerCase().includes('lankaecon news desk report') && (
-                <figcaption className="text-[11px] font-mono text-center italic text-slate-500">
+                <figcaption className="text-xs font-mono text-center italic text-slate-500">
                   {article.image_caption}
                 </figcaption>
               )}
@@ -397,6 +410,14 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                   slug: article.slug,
                   title: displayTitle,
                 })}
+                onClick={(e) => {
+                  e.preventDefault();
+                  openWhatsAppShare({
+                    article_id: article.article_id,
+                    slug: article.slug,
+                    title: displayTitle,
+                  });
+                }}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-7 h-7 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
@@ -488,11 +509,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
             </div>
           ) : (
             <div className="space-y-5 font-sans text-[15px] sm:text-[16px] text-slate-800 leading-[1.75]">
-              {paragraphs.map((para, idx) => (
-                <p key={idx} className="leading-[1.75]">
-                  {renderArticleParagraph(para, false)}
-                </p>
-              ))}
+              {renderArticleBody(displayBody, false)}
             </div>
           )}
 
@@ -548,6 +565,16 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Full Resolution Image Lightbox Modal */}
+      {isImageZoomOpen && article.featured_image_url && (
+        <ImageZoomModal
+          isOpen={isImageZoomOpen}
+          imageUrl={article.featured_image_url}
+          caption={article.image_caption || displayTitle}
+          onClose={() => setIsImageZoomOpen(false)}
+        />
+      )}
     </div>
   );
 };

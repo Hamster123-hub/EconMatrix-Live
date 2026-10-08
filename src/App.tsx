@@ -30,7 +30,7 @@ import { safeSetStorage, safeGetStorage } from './utils/safeStorage';
 import { TrendingUp, ExternalLink, ChevronLeft, ChevronRight, ArrowRight, BookOpen, Feather, BarChart2, MessageSquare, Briefcase, Newspaper, Clock } from 'lucide-react';
 import { INITIAL_ARTICLES, INITIAL_TICKERS, INITIAL_ADS } from './data/mockData';
 import { getUIText, translateArticleData, translateCategory } from './utils/translations';
-import { getArticleIdentifierFromUrl } from './utils/shareUtils';
+import { getArticleIdentifierFromUrl, getArticleUrlIdentifiers, findMatchingArticle } from './utils/shareUtils';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -59,7 +59,11 @@ export default function App() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchQuery]);
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(() => {
+    const ids = getArticleUrlIdentifiers();
+    if (!ids.id && !ids.slug && !ids.primaryKey) return null;
+    return findMatchingArticle(INITIAL_ARTICLES, ids);
+  });
   const [selectedIgStoryArticle, setSelectedIgStoryArticle] = useState<Article | null>(null);
   const [selectedSummaryStoryArticle, setSelectedSummaryStoryArticle] = useState<Article | null>(null);
   const [igStoryInitialMode, setIgStoryInitialMode] = useState<'entire_story' | 'summary'>('entire_story');
@@ -106,21 +110,19 @@ export default function App() {
   };
 
   const handleSelectArticle = (art: Article, updateHistory = true) => {
-    const isSubscriberArticle = Boolean(art.is_subscription_only || art.is_premium);
+    // Exact article is ALWAYS opened
+    setSelectedArticle(art);
 
-    // CRITICAL: The subscription modal ONLY pops up if an unsubscribed reader clicks a "Subscribed tagged story"
+    const isSubscriberArticle = Boolean(art.is_subscription_only || art.is_premium);
+    // If premium, trigger subscription modal prompt on top
     if (isSubscriberArticle && !isSubscriber && !isLoggedIn) {
       setLockedArticleTitle(art.title);
       setIsMeteredPaywallTriggered(false);
       setIsSubscriptionModalOpen(true);
-      return;
     }
 
-    // Free stories or authenticated subscribers open directly with NO modal popup
-    setSelectedArticle(art);
-
     if (updateHistory && typeof window !== 'undefined') {
-      const shareUrl = `/?article=${encodeURIComponent(art.slug || art.article_id)}`;
+      const shareUrl = `/?article=${encodeURIComponent(art.slug || art.article_id)}&id=${art.article_id}`;
       window.history.pushState({ articleId: art.article_id, slug: art.slug }, '', shareUrl);
     }
     if (typeof document !== 'undefined') {
@@ -139,24 +141,21 @@ export default function App() {
     }
   };
 
-  // Handle Deep Linking (?article=..., ?story=..., /story/:slug) on load and popstate
+  // Handle Deep Linking (?article=..., ?id=..., /story/:slug) on load and popstate
   useEffect(() => {
     const handleUrlNavigation = async () => {
-      const param = getArticleIdentifierFromUrl();
-      if (!param) {
-        if (selectedArticle) {
-          setSelectedArticle(null);
-        }
+      const ids = getArticleUrlIdentifiers();
+      if (!ids.id && !ids.slug && !ids.primaryKey) {
         return;
       }
 
       // Check in-memory articles first
-      const found = articles.find(
-        (a) =>
-          String(a.article_id) === param ||
-          a.slug === param ||
-          (a.slug && a.slug.toLowerCase() === param.toLowerCase())
-      );
+      let found: Article | null = findMatchingArticle<Article>(articles, ids);
+
+      // Also check INITIAL_ARTICLES
+      if (!found) {
+        found = findMatchingArticle<Article>(INITIAL_ARTICLES, ids);
+      }
 
       if (found) {
         handleSelectArticle(found, false);
@@ -164,16 +163,19 @@ export default function App() {
       }
 
       // If not in current articles list, fetch from server API
-      try {
-        const res = await fetch(`/api/articles/${encodeURIComponent(param)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success && data.article) {
-            handleSelectArticle(data.article, false);
+      const lookupKey = ids.id || ids.slug || ids.primaryKey;
+      if (lookupKey) {
+        try {
+          const res = await fetch(`/api/articles/${encodeURIComponent(lookupKey)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && data.article) {
+              handleSelectArticle(data.article, false);
+            }
           }
+        } catch (err) {
+          console.warn('Failed to load shared article from URL:', err);
         }
-      } catch (err) {
-        console.warn('Failed to load shared article from URL:', err);
       }
     };
 
@@ -186,6 +188,35 @@ export default function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [articles]);
+
+  // Listen for real-time background AI translations and update state seamlessly
+  useEffect(() => {
+    const onTranslated = (e: any) => {
+      const { article_id, lang, translation } = e.detail || {};
+      if (!article_id || !translation) return;
+
+      setArticles((prev) =>
+        prev.map((a) => {
+          if (String(a.article_id) === String(article_id)) {
+            const trs = { ...(a.translations || {}), [lang]: translation };
+            return { ...a, translations: trs };
+          }
+          return a;
+        })
+      );
+
+      setSelectedArticle((curr) => {
+        if (curr && String(curr.article_id) === String(article_id)) {
+          const trs = { ...(curr.translations || {}), [lang]: translation };
+          return { ...curr, translations: trs };
+        }
+        return curr;
+      });
+    };
+
+    window.addEventListener('econmatrix-article-translated', onTranslated);
+    return () => window.removeEventListener('econmatrix-article-translated', onTranslated);
+  }, []);
 
   const handleOpenIgStory = (art: Article, mode: 'entire_story' | 'summary' = 'entire_story') => {
     if (mode === 'summary') {

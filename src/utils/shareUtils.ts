@@ -1,9 +1,9 @@
 /**
  * Share & Deep-Linking Utility for EconMatrix Articles
  * Ensures that when an article is shared via WhatsApp, Twitter/X, or direct link:
- * 1. The link uniquely identifies THAT EXACT article.
+ * 1. The link uniquely identifies THAT EXACT article (both slug & immutable ID).
  * 2. When the recipient clicks the link, EconMatrix immediately opens that exact article.
- * 3. Works seamlessly on both mobile (WhatsApp app) and desktop (WhatsApp Web).
+ * 3. Works seamlessly on both mobile (WhatsApp native app) and desktop (WhatsApp Web).
  */
 
 export interface ShareableArticle {
@@ -16,13 +16,19 @@ export interface ShareableArticle {
 
 /**
  * Returns the canonical, direct share URL for an article.
- * Format: https://domain.com/?article=<slug_or_id>
+ * Always includes both the SEO slug and the permanent immutable numeric ID
+ * Format: https://domain.com/?article=<slug>&id=<article_id>
  */
 export const getArticleShareUrl = (article: { article_id: number | string; slug?: string }): string => {
   if (typeof window === 'undefined') return '';
   const origin = window.location.origin;
-  const param = article.slug || String(article.article_id);
-  return `${origin}/?article=${encodeURIComponent(param)}`;
+  const idStr = String(article.article_id);
+  const slugStr = article.slug ? article.slug.trim() : '';
+
+  if (slugStr && slugStr !== idStr) {
+    return `${origin}/?article=${encodeURIComponent(slugStr)}&id=${encodeURIComponent(idStr)}`;
+  }
+  return `${origin}/?article=${encodeURIComponent(idStr)}&id=${encodeURIComponent(idStr)}`;
 };
 
 /**
@@ -37,13 +43,38 @@ export const getArticlePathUrl = (article: { article_id: number | string; slug?:
 
 /**
  * Builds the official WhatsApp share URL.
- * Includes clean title and direct article link on separate lines so WhatsApp displays
- * both the headline and unfurls the link preview card cleanly.
+ * Uses the universal 'https://wa.me/?text=...' standard, which automatically:
+ * - Launches native WhatsApp on iOS and Android smartphones without extra dialogs.
+ * - Opens WhatsApp Web or WhatsApp Desktop on desktop browsers.
+ * Formats the headline in WhatsApp bold (*Title*) followed by the direct link on its own line
+ * to ensure WhatsApp generates a full rich card preview with thumbnail.
  */
 export const getWhatsAppShareUrl = (article: ShareableArticle): string => {
   const shareUrl = getArticleShareUrl(article);
-  const text = `${article.title}\n\nRead full story on EconMatrix:\n${shareUrl}`;
-  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  const title = (article.title || '').trim();
+  const text = `*${title}*\n\nRead full story on EconMatrix:\n${shareUrl}`;
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+};
+
+/**
+ * Direct action to trigger WhatsApp sharing with mobile/desktop intelligence.
+ * Prevents navigation bugs and handles app-switching smoothly.
+ */
+export const openWhatsAppShare = (article: ShareableArticle): void => {
+  if (typeof window === 'undefined') return;
+  const shareUrl = getArticleShareUrl(article);
+  const title = (article.title || '').trim();
+  const text = `*${title}*\n\nRead full story on EconMatrix:\n${shareUrl}`;
+  const encodedText = encodeURIComponent(text);
+
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) {
+    // Open wa.me directly which mobile OS intercepts to open native WhatsApp app
+    window.location.href = `https://wa.me/?text=${encodedText}`;
+  } else {
+    // Desktop: open WhatsApp Web in new tab
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
+  }
 };
 
 /**
@@ -115,32 +146,113 @@ export const shareArticleNativeOrCopy = async (article: ShareableArticle): Promi
   return copied ? 'copied' : 'failed';
 };
 
+export interface ArticleUrlIdentifiers {
+  id?: string | null;
+  slug?: string | null;
+  primaryKey: string | null;
+}
+
 /**
- * Extracts the article identifier (slug or article_id) from the current window location.
- * Recognizes:
- * - Query params: ?article=..., ?story=..., ?id=...
- * - Pathnames: /story/:slug, /article/:id
+ * Returns all potential article identifiers present in the current URL:
+ * - Specific ID parameter (e.g. ?id=1791095288704)
+ * - Specific Slug parameter (e.g. ?article=hambantota-port...)
+ * - Pathnames and hashes
  */
-export const getArticleIdentifierFromUrl = (): string | null => {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    // 1. Check query parameters (?article=..., ?story=..., ?id=...)
-    const params = new URLSearchParams(window.location.search);
-    const param = params.get('article') || params.get('story') || params.get('id');
-    if (param && param.trim()) {
-      return decodeURIComponent(param.trim());
-    }
-
-    // 2. Check pathnames (/story/:slug or /article/:id)
-    const pathname = window.location.pathname;
-    const match = pathname.match(/^\/(?:story|article)\/([^/?#]+)/i);
-    if (match && match[1]) {
-      return decodeURIComponent(match[1].trim());
-    }
-  } catch {
-    return null;
+export const getArticleUrlIdentifiers = (): ArticleUrlIdentifiers => {
+  if (typeof window === 'undefined') {
+    return { id: null, slug: null, primaryKey: null };
   }
 
-  return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const idParam = params.get('id') || params.get('article_id');
+    const slugParam = params.get('article') || params.get('story') || params.get('slug') || params.get('news');
+
+    let cleanId = idParam && idParam.trim() ? decodeURIComponent(idParam.trim()) : null;
+    let cleanSlug = slugParam && slugParam.trim() ? decodeURIComponent(slugParam.trim()) : null;
+
+    // Check hash (#article=... or #1791095288704 or #/story/slug)
+    if (window.location.hash) {
+      const hashStr = window.location.hash.replace(/^#\/?/, '');
+      if (hashStr.includes('=') || hashStr.includes('?')) {
+        const hashParams = new URLSearchParams(hashStr.includes('?') ? hashStr.split('?')[1] : hashStr);
+        const hashId = hashParams.get('id') || hashParams.get('article_id');
+        const hashSlug = hashParams.get('article') || hashParams.get('story') || hashParams.get('slug');
+        if (hashId && !cleanId) cleanId = decodeURIComponent(hashId.trim());
+        if (hashSlug && !cleanSlug) cleanSlug = decodeURIComponent(hashSlug.trim());
+      }
+      const hashMatch = hashStr.match(/^(?:story|article|news)\/([^/?#]+)/i);
+      if (hashMatch && hashMatch[1] && !cleanSlug) {
+        cleanSlug = decodeURIComponent(hashMatch[1].trim());
+      }
+      if (/^\d{3,20}$/.test(hashStr) && !cleanId) {
+        cleanId = hashStr;
+      }
+    }
+
+    // Check pathnames (/story/:slug or /article/:id or /news/:slug)
+    const pathname = window.location.pathname;
+    const match = pathname.match(/^\/(?:story|article|news)\/([^/?#]+)/i);
+    if (match && match[1] && !cleanSlug && !cleanId) {
+      const pathParam = decodeURIComponent(match[1].trim());
+      if (/^\d{3,20}$/.test(pathParam)) {
+        cleanId = pathParam;
+      } else {
+        cleanSlug = pathParam;
+      }
+    }
+
+    const primaryKey = cleanId || cleanSlug || null;
+    return { id: cleanId, slug: cleanSlug, primaryKey };
+  } catch {
+    return { id: null, slug: null, primaryKey: null };
+  }
+};
+
+/**
+ * Extracts the single primary article identifier from current location.
+ */
+export const getArticleIdentifierFromUrl = (): string | null => {
+  const ids = getArticleUrlIdentifiers();
+  return ids.id || ids.slug || ids.primaryKey || null;
+};
+
+/**
+ * Helper to match an article from an array using all URL keys.
+ */
+export const findMatchingArticle = <T extends { article_id: string | number; slug?: string; title?: string }>(
+  articlesList: T[],
+  identifiers: ArticleUrlIdentifiers
+): T | null => {
+  const { id, slug, primaryKey } = identifiers;
+  if (!id && !slug && !primaryKey) return null;
+
+  return articlesList.find((a) => {
+    const aId = String(a.article_id);
+    const aSlug = (a.slug || '').toLowerCase();
+    const aSlugClean = aSlug.replace(/[^a-z0-9]/g, '');
+
+    // 1. Exact numeric ID match
+    if (id && aId === id) return true;
+
+    // 2. Exact slug or slug-without-hyphens match
+    if (slug) {
+      const slugLower = slug.toLowerCase();
+      const slugClean = slugLower.replace(/[^a-z0-9]/g, '');
+      if (aSlug === slugLower || aId === slug) return true;
+      if (slugClean && aSlugClean === slugClean) return true;
+      if (a.title && a.title.toLowerCase() === slugLower) return true;
+    }
+
+    // 3. Fallback match with primaryKey
+    if (primaryKey) {
+      const pkLower = primaryKey.toLowerCase();
+      const pkClean = pkLower.replace(/[^a-z0-9]/g, '');
+      if (aId === primaryKey || aSlug === pkLower) return true;
+      if (pkClean && aSlugClean === pkClean) return true;
+      if (a.title && a.title.toLowerCase() === pkLower) return true;
+    }
+
+    return false;
+  }) || null;
 };

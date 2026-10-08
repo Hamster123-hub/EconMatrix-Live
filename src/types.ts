@@ -67,6 +67,17 @@ export interface ArticleTranslations {
   ta?: ArticleTranslation;
 }
 
+export interface StoryInlineImage {
+  type: 'single' | 'side-by-side';
+  url?: string;
+  caption?: string;
+  alt?: string;
+  image1?: { url: string; caption?: string; alt?: string };
+  image2?: { url: string; caption?: string; alt?: string };
+  overallCaption?: string;
+  position?: number;
+}
+
 export interface Article {
   article_id: number;
   title: string;
@@ -95,6 +106,8 @@ export interface Article {
   notable_position?: 'left' | 'right' | 'none';
   is_notable?: boolean;
   is_spotlight?: boolean;
+  inline_images?: StoryInlineImage[];
+  gallery?: string[];
   last_edited_by?: string;
   last_edited_at?: string;
 }

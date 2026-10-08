@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Article } from '../types';
-import { Clock, Lock, Heart, Volume2, Sparkles, Check, ChevronRight } from 'lucide-react';
+import { Clock, Lock, Heart, Volume2, Sparkles, Check, ChevronRight, MessageCircle } from 'lucide-react';
 import { ThemeStyle } from './Header';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
+import { openWhatsAppShare } from '../utils/shareUtils';
 
 interface ArticleCardProps {
   article: Article;
@@ -322,6 +323,27 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
               >
                 <Heart className={`w-3 h-3 ${hasLiked ? 'fill-rose-600 text-rose-600' : 'text-slate-400'}`} />
                 <span>{likesCount}</span>
+              </button>
+
+              {/* WhatsApp Share Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openWhatsAppShare({
+                    article_id: article.article_id,
+                    slug: article.slug,
+                    title: displayTitle,
+                  });
+                }}
+                className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase transition cursor-pointer border rounded-xs ${
+                  isVibrant
+                    ? 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border-emerald-700/60'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}
+                title="Share this exact article on WhatsApp"
+              >
+                <MessageCircle className="w-3 h-3 text-emerald-600 fill-current" />
+                <span>WhatsApp</span>
               </button>
             </div>
           </div>

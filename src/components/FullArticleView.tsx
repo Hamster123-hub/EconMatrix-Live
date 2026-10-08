@@ -17,13 +17,15 @@ import {
   Sun, 
   ChevronUp,
   Printer,
-  Copy
+  Copy,
+  ZoomIn
 } from 'lucide-react';
 import { translateArticleData, getUIText, translateCategory } from '../utils/translations';
-import { renderArticleParagraph } from '../utils/articleRenderer';
+import { renderArticleParagraph, renderArticleBody, ImageZoomModal } from '../utils/articleRenderer';
 import {
   getArticleShareUrl,
   getWhatsAppShareUrl,
+  openWhatsAppShare,
   getTwitterShareUrl,
   copyArticleShareUrl,
   shareArticleNativeOrCopy,
@@ -57,6 +59,7 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
   const [hasLiked, setHasLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isFeaturedImageZoomOpen, setIsFeaturedImageZoomOpen] = useState(false);
 
   // User-Friendliness: Reading Progress, Font Size, Reader Dark/Light Canvas Mode
   const [readingProgress, setReadingProgress] = useState(0);
@@ -400,8 +403,8 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
         </div>
       </div>
 
-      {/* Main Full-Page Article Canvas - Narrower and Longer */}
-      <div className={`max-w-[700px] mx-auto px-4 sm:px-6 py-8 space-y-6 ${isNightReader ? 'bg-[#0a0f1d]' : 'bg-white'}`}>
+      {/* Main Full-Page Article Canvas - Optimized for Reading and Desktop/Laptop View */}
+      <div className={`max-w-[700px] md:max-w-[760px] lg:max-w-[820px] mx-auto px-4 sm:px-6 py-8 space-y-6 ${isNightReader ? 'bg-[#0a0f1d]' : 'bg-white'}`}>
         
         {/* 1. Category & Analysis Breadcrumb (Screenshot 1 Format) */}
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -471,20 +474,30 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
           </div>
         </div>
 
-        {/* 4. Featured Cover Image (Smaller & Compact) */}
+        {/* 4. Featured Cover Image - Fully displayed without edge clipping on laptop/computer */}
         {article.featured_image_url && (
-          <figure className="space-y-1.5 max-w-[540px] mx-auto">
-            <div className={`w-full max-h-[220px] sm:max-h-[240px] overflow-hidden rounded-sm border ${
-              isNightReader ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
-            }`}>
+          <figure className="space-y-2 w-full mx-auto group">
+            <div
+              onClick={() => setIsFeaturedImageZoomOpen(true)}
+              className={`w-full overflow-hidden rounded-sm border cursor-pointer relative transition-all duration-200 flex items-center justify-center ${
+                isNightReader ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+              }`}
+              title="Click to view full-resolution photo"
+            >
               <img
                 src={article.featured_image_url}
                 alt={displayTitle}
-                className="w-full h-[180px] sm:h-[220px] object-cover"
+                className="w-full h-auto max-h-[520px] md:max-h-[580px] lg:max-h-[640px] object-contain mx-auto transition-transform duration-300 group-hover:scale-[1.005]"
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors flex items-center justify-center pointer-events-none">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/85 text-white text-xs px-3 py-1.5 rounded-sm shadow-md flex items-center gap-1.5 font-mono">
+                  <ZoomIn className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Enlarge Full Size</span>
+                </span>
+              </div>
             </div>
             {article.image_caption && article.image_caption.trim() && !article.image_caption.toLowerCase().includes('lankaecon news desk report') && (
-              <figcaption className={`text-[11px] font-mono text-center italic ${isNightReader ? 'text-slate-400' : 'text-slate-500'}`}>
+              <figcaption className={`text-xs font-mono text-center italic ${isNightReader ? 'text-slate-400' : 'text-slate-600'}`}>
                 {article.image_caption}
               </figcaption>
             )}
@@ -565,6 +578,14 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
                 slug: article.slug,
                 title: displayTitle,
               })}
+              onClick={(e) => {
+                e.preventDefault();
+                openWhatsAppShare({
+                  article_id: article.article_id,
+                  slug: article.slug,
+                  title: displayTitle,
+                });
+              }}
               target="_blank"
               rel="noopener noreferrer"
               className="w-8 h-8 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
@@ -631,15 +652,11 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
           </div>
         )}
 
-        {/* 8. Full Formatted Article Body (Screenshot 2 Format) */}
+        {/* 8. Full Formatted Article Body with Rich Inline Images & Side-by-Side Grids */}
         <div className={`space-y-6 font-sans ${getBodyFontSize()} ${
           isNightReader ? 'text-slate-200' : 'text-slate-800'
         }`}>
-          {paragraphs.map((para, idx) => (
-            <p key={idx} className="leading-relaxed">
-              {renderArticleParagraph(para, isNightReader)}
-            </p>
-          ))}
+          {renderArticleBody(displayBody, isNightReader)}
         </div>
 
         {/* Article Footer & Reader Engagement */}
@@ -785,6 +802,16 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
         >
           <ChevronUp className="w-5 h-5" />
         </button>
+      )}
+
+      {/* Full Resolution Featured Image Lightbox Modal */}
+      {isFeaturedImageZoomOpen && article.featured_image_url && (
+        <ImageZoomModal
+          isOpen={isFeaturedImageZoomOpen}
+          imageUrl={article.featured_image_url}
+          caption={article.image_caption || displayTitle}
+          onClose={() => setIsFeaturedImageZoomOpen(false)}
+        />
       )}
     </article>
   );

@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Image as ImageIcon,
+  Columns,
   Globe,
   Eye,
   Loader2,
@@ -685,6 +686,44 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                     placeholder="e.g. Photo: Central Bank of Sri Lanka Headquarters"
                     className="w-full text-xs bg-slate-50 border border-slate-300 p-2 focus:bg-white focus:border-[#0284C7] outline-none"
                   />
+                </div>
+              </div>
+
+              {/* MIDDLE STORY IMAGES STATUS CARD */}
+              <div className="bg-white border border-purple-200 p-4 shadow-xs space-y-3 rounded-xs">
+                <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-purple-600" />
+                    <span className="font-extrabold text-xs uppercase tracking-wider text-slate-900">Middle Story Images</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold bg-purple-50 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-full">
+                    {(() => {
+                      const singles = (body.match(/!\[.*?\]\(.*?\)/g) || []).length;
+                      const sbs = (body.match(/:::side-by-side/g) || []).length;
+                      return `${singles} Photos (${sbs} Side-by-Side)`;
+                    })()}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Use the editor toolbar above to insert images directly into the middle of the story:
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 bg-purple-50/70 rounded-xs border border-purple-200 flex flex-col gap-1">
+                    <span className="font-bold text-purple-900 flex items-center gap-1">
+                      <ImageIcon className="w-3.5 h-3.5 text-purple-700" />
+                      <span>1 Middle Image</span>
+                    </span>
+                    <span className="text-[10.5px] text-slate-600">Full-width photo with caption and zoom lightbox.</span>
+                  </div>
+                  <div className="p-2 bg-indigo-50/70 rounded-xs border border-indigo-200 flex flex-col gap-1">
+                    <span className="font-bold text-indigo-900 flex items-center gap-1">
+                      <Columns className="w-3.5 h-3.5 text-indigo-700" />
+                      <span>2 Side-by-Side</span>
+                    </span>
+                    <span className="text-[10.5px] text-slate-600">Dual synchronized columns with captions & header.</span>
+                  </div>
                 </div>
               </div>
 

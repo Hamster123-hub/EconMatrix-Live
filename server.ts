@@ -9,7 +9,8 @@ import { INITIAL_ARTICLES, INITIAL_TICKERS, INITIAL_AUTHORS, INITIAL_MEDIA_ASSET
 import { INITIAL_SCHOLAR_WRITERS, INITIAL_ECON_MEDIA, INITIAL_ECON_BOOKS, INITIAL_SCHOLAR_ARTICLES, INITIAL_ECON_COURSES } from './src/data/econAcademyData';
 import { INITIAL_LANKA_INK_CREATIONS, INITIAL_LANKA_INK_ARTISANS, INITIAL_LANKA_INK_INTERVIEWS, INITIAL_LANKA_INK_ORDERS } from './src/data/lankaInkData';
 import { INITIAL_CBSL_MONTHLY_DATA } from './src/data/cbslMonthlyData';
-import { Article, StockTicker, Author, MediaAsset, ScholarWriter, EconMediaContent, EconBook, EconScholarArticle, EconCourse, Lesson, AdCampaign, AdSlotLocation, AdSlotPricing, AdStatus, AdEmailLog, LankaInkCreation, LankaInkArtisan, LankaInkInterview, LankaInkOrder, WhatsAppGroup, WhatsAppPushLog, EmployeeRecord, PublisherSubmission, PayoutRecord, TaxInvoice, PayrollRecord, ErpApiConfig, TuitionReceipt, CbslMonthlyIndicator, AccountingLedgerEntry, CustomAccountingEntry, PaymentGatewayConfig } from './src/types';
+import { Article, StoryInlineImage, StockTicker, Author, MediaAsset, ScholarWriter, EconMediaContent, EconBook, EconScholarArticle, EconCourse, Lesson, AdCampaign, AdSlotLocation, AdSlotPricing, AdStatus, AdEmailLog, LankaInkCreation, LankaInkArtisan, LankaInkInterview, LankaInkOrder, WhatsAppGroup, WhatsAppPushLog, EmployeeRecord, PublisherSubmission, PayoutRecord, TaxInvoice, PayrollRecord, ErpApiConfig, TuitionReceipt, CbslMonthlyIndicator, AccountingLedgerEntry, CustomAccountingEntry, PaymentGatewayConfig } from './src/types';
+import { generateArticleBothTranslations, translateFinancialArticle } from './src/utils/financialTranslator';
 
 interface ServerForexRate {
   currency: string;
@@ -335,6 +336,148 @@ function dispatchSubscriberArticleAlerts(article: Article): {
   };
 }
 
+// Helper to intelligently insert markdown/HTML image snippet into a story body
+export function insertImageIntoStoryBody(
+  body: string,
+  snippet: string,
+  position: 'middle' | 'start' | 'end' | number | string = 'middle'
+): string {
+  if (!body || !body.trim()) {
+    return snippet.trim();
+  }
+
+  const paragraphs = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length <= 1) {
+    return `${body.trim()}\n\n${snippet.trim()}`;
+  }
+
+  let insertIdx = 1;
+  if (position === 'start') {
+    insertIdx = 1;
+  } else if (position === 'end') {
+    insertIdx = paragraphs.length;
+  } else if (typeof position === 'number' || (!isNaN(Number(position)) && typeof position === 'string' && position !== 'middle' && position !== 'start' && position !== 'end')) {
+    const num = Number(position);
+    insertIdx = Math.max(0, Math.min(num, paragraphs.length));
+  } else {
+    // Default: 'middle' - calculate the exact midpoint
+    insertIdx = Math.max(1, Math.floor(paragraphs.length / 2));
+  }
+
+  paragraphs.splice(insertIdx, 0, snippet.trim());
+  return paragraphs.join('\n\n');
+}
+
+// Helper to parse story body text and extract all inline images and side-by-side grids into structured metadata
+export function extractStoryInlineImages(body: string): StoryInlineImage[] {
+  if (!body) return [];
+  const rawBlocks = body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const results: StoryInlineImage[] = [];
+
+  rawBlocks.forEach((raw, idx) => {
+    // 1. :::side-by-side or :::image-grid
+    const sideBySideBlockMatch = raw.match(/^:::(?:side-by-side|image-grid)(?:[^\n]*caption=["'](.*?)["'])?([\s\S]*?):::$/i);
+    if (sideBySideBlockMatch) {
+      const overallCap = sideBySideBlockMatch[1] || undefined;
+      const innerContent = sideBySideBlockMatch[2] || '';
+      const imgMatches = Array.from(innerContent.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+      if (imgMatches.length >= 2) {
+        results.push({
+          type: 'side-by-side',
+          image1: { caption: imgMatches[0][1] || undefined, url: imgMatches[0][2].trim() },
+          image2: { caption: imgMatches[1][1] || undefined, url: imgMatches[1][2].trim() },
+          overallCaption: overallCap,
+          position: idx,
+        });
+        return;
+      }
+    }
+
+    // 2. HTML side-by-side container <div class="story-images-grid-2"...>
+    const htmlGridMatch = raw.match(/<div\b[^>]*(?:story-images-grid|story-side-by-side)[^>]*>([\s\S]*?)<\/div>/i);
+    if (htmlGridMatch) {
+      const capMatch = raw.match(/data-caption=["'](.*?)["']/i);
+      const overallCap = capMatch ? capMatch[1] : undefined;
+      const imgMatches = Array.from(raw.matchAll(/<img\b[^>]*src=["'](.*?)["'][^>]*(?:alt=["'](.*?)["'])?/gi));
+      const figcaps = Array.from(raw.matchAll(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/gi)).map((m) => m[1]);
+      if (imgMatches.length >= 2) {
+        results.push({
+          type: 'side-by-side',
+          image1: { url: imgMatches[0][1].trim(), caption: figcaps[0] || imgMatches[0][2] || undefined },
+          image2: { url: imgMatches[1][1].trim(), caption: figcaps[1] || imgMatches[1][2] || undefined },
+          overallCaption: overallCap,
+          position: idx,
+        });
+        return;
+      }
+    }
+
+    // 3. Shortcode [side-by-side: url1 | url2 | caption: ...]
+    const shortcodeGridMatch = raw.match(/^\[(?:images|images-grid|side-by-side):\s*([^\s|]+)\s*\|\s*([^\s|]+)(?:\s*\|\s*caption:\s*(.*?))?\]$/i);
+    if (shortcodeGridMatch) {
+      results.push({
+        type: 'side-by-side',
+        image1: { url: shortcodeGridMatch[1].trim() },
+        image2: { url: shortcodeGridMatch[2].trim() },
+        overallCaption: shortcodeGridMatch[3] ? shortcodeGridMatch[3].trim() : undefined,
+        position: idx,
+      });
+      return;
+    }
+
+    // 4. Two adjacent markdown images
+    const twoImagesMatch = Array.from(raw.matchAll(/!\[(.*?)\]\((.*?)\)/g));
+    const nonImageText = raw.replace(/!\[(.*?)\]\((.*?)\)/g, '').trim();
+    if (twoImagesMatch.length === 2 && nonImageText.length === 0) {
+      results.push({
+        type: 'side-by-side',
+        image1: { caption: twoImagesMatch[0][1] || undefined, url: twoImagesMatch[0][2].trim() },
+        image2: { caption: twoImagesMatch[1][1] || undefined, url: twoImagesMatch[1][2].trim() },
+        position: idx,
+      });
+      return;
+    }
+
+    // 5. Single markdown image ![caption](url)
+    const singleImageMatch = raw.match(/^!\[(.*?)\]\((.*?)\)$/);
+    if (singleImageMatch) {
+      results.push({
+        type: 'single',
+        caption: singleImageMatch[1] || undefined,
+        url: singleImageMatch[2].trim(),
+        position: idx,
+      });
+      return;
+    }
+
+    // 6. Figure HTML <figure class="story-image">...
+    const figureMatch = raw.match(/<figure\b[^>]*>[\s\S]*?<img\b[^>]*src=["'](.*?)["'][^>]*(?:alt=["'](.*?)["'])?[\s\S]*?(?:<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i);
+    if (figureMatch) {
+      results.push({
+        type: 'single',
+        url: figureMatch[1].trim(),
+        caption: figureMatch[3] || figureMatch[2] || undefined,
+        position: idx,
+      });
+      return;
+    }
+
+    // 7. [image: url | caption: ...]
+    const singleShortcodeMatch = raw.match(/^\[image:\s*([^\s|]+)(?:\s*\|\s*caption:\s*(.*?))?\]$/i);
+    if (singleShortcodeMatch) {
+      results.push({
+        type: 'single',
+        url: singleShortcodeMatch[1].trim(),
+        caption: singleShortcodeMatch[2] ? singleShortcodeMatch[2].trim() : undefined,
+        position: idx,
+      });
+      return;
+    }
+  });
+
+  return results;
+}
+
 // PERSISTENT STORAGE DIRECTORY (Survives git updates, code resets, and server redeploys)
 const PERSISTENT_STORAGE_DIR = (() => {
   if (process.env.DATA_DIR && fs.existsSync(process.env.DATA_DIR)) {
@@ -409,7 +552,18 @@ function loadStoresFromDisk() {
       const raw = fs.readFileSync(sourcePath, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.articlesStore) && parsed.articlesStore.length > 0) {
-        articlesStore = parsed.articlesStore.map((a: Article) => {
+        const loadedIds = new Set(parsed.articlesStore.map((a: Article) => String(a.article_id)));
+        const missingFromInitial = INITIAL_ARTICLES.filter((a) => !loadedIds.has(String(a.article_id)));
+        const mergedList = [...parsed.articlesStore, ...missingFromInitial];
+        mergedList.sort((a, b) => {
+          if (a.is_breaking && !b.is_breaking) return -1;
+          if (!a.is_breaking && b.is_breaking) return 1;
+          const timeA = new Date(a.published_at || a.created_at || 0).getTime() || Number(a.article_id) || 0;
+          const timeB = new Date(b.published_at || b.created_at || 0).getTime() || Number(b.article_id) || 0;
+          return timeB - timeA;
+        });
+
+        articlesStore = mergedList.map((a: Article) => {
           let updated = { ...a };
           if (updated.image_caption && updated.image_caption.toLowerCase().includes('lankaecon news desk report')) {
             updated.image_caption = '';
@@ -417,6 +571,9 @@ function loadStoresFromDisk() {
           if (updated.featured_image_url && updated.featured_image_url.includes('photo-1545324418-cc1a3fa10c00')) {
             updated.featured_image_url = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
           }
+          updated.inline_images = (updated.inline_images && updated.inline_images.length > 0)
+            ? updated.inline_images
+            : extractStoryInlineImages(updated.body);
           return updated;
         });
       }
@@ -1610,14 +1767,179 @@ Extract exact month-end statistical values from the official CBSL MEI tables for
   });
 
   app.get('/api/articles/:slug', (req, res) => {
-    const { slug } = req.params;
-    const article = articlesStore.find((a) => a.slug === slug || String(a.article_id) === slug);
+    const rawSlug = req.params.slug || '';
+    let decodedSlug = rawSlug;
+    try {
+      decodedSlug = decodeURIComponent(rawSlug).trim();
+    } catch {
+      decodedSlug = rawSlug.trim();
+    }
+    const cleanLower = decodedSlug.toLowerCase();
+    const cleanNoHyphens = cleanLower.replace(/[^a-z0-9]/g, '');
+
+    // Search in articlesStore first
+    let article = articlesStore.find((a) => {
+      const aId = String(a.article_id);
+      const aSlug = (a.slug || '').toLowerCase();
+      const aSlugNoHyphens = aSlug.replace(/[^a-z0-9]/g, '');
+
+      return (
+        aId === rawSlug ||
+        aId === decodedSlug ||
+        aSlug === cleanLower ||
+        (cleanNoHyphens && aSlugNoHyphens === cleanNoHyphens) ||
+        (a.title && a.title.toLowerCase() === cleanLower)
+      );
+    });
+
+    // Fallback to INITIAL_ARTICLES if not yet in store
+    if (!article) {
+      article = INITIAL_ARTICLES.find((a) => {
+        const aId = String(a.article_id);
+        const aSlug = (a.slug || '').toLowerCase();
+        const aSlugNoHyphens = aSlug.replace(/[^a-z0-9]/g, '');
+
+        return (
+          aId === rawSlug ||
+          aId === decodedSlug ||
+          aSlug === cleanLower ||
+          (cleanNoHyphens && aSlugNoHyphens === cleanNoHyphens) ||
+          (a.title && a.title.toLowerCase() === cleanLower)
+        );
+      });
+      if (article) {
+        articlesStore.unshift(article);
+      }
+    }
+
     if (!article) {
       res.status(404).json({ success: false, error: 'Article not found' });
       return;
     }
-    article.view_count += 1;
+    article.view_count = (article.view_count || 0) + 1;
     res.json({ success: true, article });
+  });
+
+  // Dynamic on-demand translation endpoint for entire articles
+  app.post('/api/translate-article', async (req, res) => {
+    try {
+      const { articleId, title, deck, body, category, targetLang } = req.body;
+      const lang = targetLang === 'ta' ? 'ta' : 'si';
+
+      if (!title) {
+        res.status(400).json({ success: false, error: 'Title is required for translation.' });
+        return;
+      }
+
+      // 1. Check if article in articlesStore already has this translation
+      if (articleId) {
+        const existing = articlesStore.find((a) => String(a.article_id) === String(articleId));
+        if (existing?.translations?.[lang]?.title && existing?.translations?.[lang]?.body) {
+          res.json({ success: true, translation: existing.translations[lang] });
+          return;
+        }
+      }
+
+      // 2. Call Gemini AI translation if available
+      if (isGeminiAvailable()) {
+        try {
+          const langName = lang === 'si' ? 'Sinhala (සිංහල)' : 'Tamil (தமிழ்)';
+          const prompt = `You are LankaEcon's elite bilingual financial journalist and economic translator.
+Translate the following financial news report into high-quality, professional, and natural ${langName}.
+Keep all figures, percentages, dates, and technical metrics accurate.
+
+Title: ${title}
+Summary/Deck: ${deck || title}
+Category: ${category || 'ECONOMY'}
+Body:
+${(body || deck || title).substring(0, 4000)}
+
+Return strictly a JSON object with this exact structure:
+{
+  "title": "${langName} translated headline",
+  "deck": "${langName} translated summary",
+  "body": "${langName} translated body paragraphs",
+  "primary_category": "${langName} category name"
+}`;
+
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' },
+          });
+
+          const parsed = JSON.parse(response.text || '{}');
+          if (parsed && parsed.title) {
+            const translation = {
+              title: parsed.title,
+              deck: parsed.deck || parsed.title,
+              body: parsed.body || parsed.deck || parsed.title,
+              primary_category: parsed.primary_category || (lang === 'si' ? 'ආර්ථිකය' : 'பொருளாதாரம்'),
+            };
+
+            // Cache onto store article
+            if (articleId) {
+              const target = articlesStore.find((a) => String(a.article_id) === String(articleId));
+              if (target) {
+                if (!target.translations) target.translations = {};
+                target.translations[lang] = translation;
+                saveStoresToDisk();
+              }
+            }
+
+            res.json({ success: true, translation });
+            return;
+          }
+        } catch (err: any) {
+          handleGeminiError('Article Translation', err);
+        }
+      }
+
+      // 3. Guaranteed high-fidelity financial translation fallback
+      const fallbackTranslation = translateFinancialArticle(
+        { title, deck, body, primary_category: category },
+        lang
+      );
+
+      if (articleId) {
+        const target = articlesStore.find((a) => String(a.article_id) === String(articleId));
+        if (target) {
+          if (!target.translations) target.translations = {};
+          target.translations[lang] = fallbackTranslation;
+          saveStoresToDisk();
+        }
+      }
+
+      res.json({ success: true, translation: fallbackTranslation, isFallback: true });
+    } catch (err) {
+      console.error('Translation endpoint error:', err);
+      res.status(500).json({ success: false, error: 'Translation failed' });
+    }
+  });
+
+  // Batch translation endpoint for multiple stories
+  app.post('/api/articles/translate-batch', async (req, res) => {
+    try {
+      const { articles, targetLang } = req.body;
+      const lang = targetLang === 'ta' ? 'ta' : 'si';
+      if (!Array.isArray(articles) || articles.length === 0) {
+        res.json({ success: true, translations: {} });
+        return;
+      }
+
+      const results: Record<string, any> = {};
+      for (const item of articles.slice(0, 10)) {
+        if (!item?.article_id) continue;
+        const existing = articlesStore.find((a) => String(a.article_id) === String(item.article_id));
+        if (existing?.translations?.[lang]) {
+          results[item.article_id] = existing.translations[lang];
+        }
+      }
+
+      res.json({ success: true, translations: results });
+    } catch (err) {
+      res.status(500).json({ success: false, error: 'Batch translation failed' });
+    }
   });
 
   app.post('/api/ai/summarize', async (req, res) => {
@@ -1705,9 +2027,9 @@ Story Body: ${body.substring(0, 3500)}`,
   });
 
   async function generateArticleTranslations(title: string, deck: string, body: string, category: string) {
-    if (!isGeminiAvailable()) return null;
-    try {
-      const prompt = `You are an expert Sri Lankan financial translator for LankaEcon.
+    if (isGeminiAvailable()) {
+      try {
+        const prompt = `You are an expert Sri Lankan financial translator for LankaEcon.
 Translate the following financial news report into high-quality Sinhala (සිංහල) and Tamil (தமிழ்).
 
 Title: ${title}
@@ -1732,20 +2054,23 @@ Return strictly a JSON object with this exact structure:
   }
 }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
-      });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        });
 
-      const parsed = JSON.parse(response.text || '{}');
-      if (parsed.si && parsed.ta) {
-        return parsed;
+        const parsed = JSON.parse(response.text || '{}');
+        if (parsed.si && parsed.ta && parsed.si.title && parsed.ta.title) {
+          return parsed;
+        }
+      } catch (err: any) {
+        handleGeminiError('Translation', err);
       }
-    } catch (err: any) {
-      handleGeminiError('Translation', err);
     }
-    return null;
+
+    // High-fidelity autonomous financial journalism translation engine (Always guaranteed, 100% Sinhala and Tamil)
+    return generateArticleBothTranslations(title, deck, body, category);
   }
 
   app.post('/api/admin/publish-manual', async (req, res) => {
@@ -1809,6 +2134,10 @@ Return strictly a JSON object with this exact structure:
         notable_position: req.body.placement === 'notable' ? 'left' : req.body.placement === 'spotlight' ? 'right' : 'none',
         is_notable: req.body.placement === 'notable',
         is_spotlight: req.body.placement === 'spotlight',
+        inline_images: (req.body.inline_images && Array.isArray(req.body.inline_images))
+          ? req.body.inline_images
+          : extractStoryInlineImages((body || '').trim()),
+        gallery: req.body.gallery || undefined,
       };
 
       if (newArticle.is_lead_story || newArticle.placement === 'lead') {
@@ -1972,6 +2301,8 @@ Return strictly a JSON object with this exact structure:
       authors,
       translations,
       editor_name,
+      inline_images,
+      gallery,
     } = req.body;
 
     const targetIdStr = String(article_id);
@@ -1984,7 +2315,10 @@ Return strictly a JSON object with this exact structure:
 
     if (title !== undefined) target.title = String(title).trim();
     if (deck !== undefined) target.deck = String(deck).trim();
-    if (body !== undefined) target.body = String(body).trim();
+    if (body !== undefined) {
+      target.body = String(body).trim();
+      target.inline_images = extractStoryInlineImages(target.body);
+    }
     if (primary_category !== undefined) target.primary_category = String(primary_category).toUpperCase();
     if (featured_image_url !== undefined) target.featured_image_url = String(featured_image_url).trim();
     if (image_caption !== undefined) target.image_caption = String(image_caption).trim();
@@ -1993,6 +2327,8 @@ Return strictly a JSON object with this exact structure:
     if (is_featured !== undefined) target.is_featured = Boolean(is_featured);
     if (is_subscription_only !== undefined) target.is_subscription_only = Boolean(is_subscription_only);
     if (is_premium !== undefined) target.is_premium = Boolean(is_premium);
+    if (inline_images !== undefined && Array.isArray(inline_images)) target.inline_images = inline_images;
+    if (gallery !== undefined && Array.isArray(gallery)) target.gallery = gallery;
     if (translations !== undefined) target.translations = translations;
 
     // Handle placement & lead story
@@ -2079,7 +2415,10 @@ Return strictly a JSON object with this exact structure:
 
     if (title !== undefined) target.title = String(title).trim();
     if (deck !== undefined) target.deck = String(deck).trim();
-    if (body !== undefined) target.body = String(body).trim();
+    if (body !== undefined) {
+      target.body = String(body).trim();
+      target.inline_images = extractStoryInlineImages(target.body);
+    }
     if (primary_category !== undefined) target.primary_category = String(primary_category).toUpperCase();
     if (featured_image_url !== undefined) target.featured_image_url = String(featured_image_url).trim();
     if (image_caption !== undefined) target.image_caption = String(image_caption).trim();
@@ -4372,6 +4711,372 @@ Return strictly a JSON object with this exact structure:
       console.warn('[Image Upload Error]:', err?.message || err);
       res.status(500).json({ success: false, error: err?.message || 'Failed to process and store image file' });
     }
+  });
+
+  // Helper to persist base64 / data-url image to disk & uploads dir
+  function saveStoryInlineImage(imageData: string, customFileName?: string): { url: string; fileName: string; fileSize: string } {
+    const matches = imageData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.*)$/);
+    let buffer: Buffer;
+    let extension = 'jpg';
+
+    if (matches && matches.length === 3) {
+      const mimeType = matches[1].toLowerCase();
+      if (mimeType.includes('png')) extension = 'png';
+      else if (mimeType.includes('webp')) extension = 'webp';
+      else if (mimeType.includes('gif')) extension = 'gif';
+      else if (mimeType.includes('svg')) extension = 'svg';
+      else extension = 'jpg';
+
+      buffer = Buffer.from(matches[2], 'base64');
+    } else {
+      buffer = Buffer.from(imageData, 'base64');
+    }
+
+    const rawFileName = customFileName || `story-inline-${Date.now()}.${extension}`;
+    const nameWithoutExt = rawFileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const uniqueId = `inline-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const savedFileName = `${uniqueId}-${nameWithoutExt}.${extension}`;
+
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      try {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      } catch {}
+    }
+
+    const filePath = path.join(UPLOADS_DIR, savedFileName);
+    fs.writeFileSync(filePath, buffer);
+
+    try {
+      const distUploadsDir = path.join(process.cwd(), 'dist', 'uploads');
+      if (fs.existsSync(path.join(process.cwd(), 'dist'))) {
+        if (!fs.existsSync(distUploadsDir)) {
+          fs.mkdirSync(distUploadsDir, { recursive: true });
+        }
+        fs.writeFileSync(path.join(distUploadsDir, savedFileName), buffer);
+      }
+    } catch {}
+
+    const bytes = buffer.length;
+    const fileSize = bytes > 1024 * 1024
+      ? `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+      : `${Math.round(bytes / 1024)} KB`;
+
+    return {
+      url: `/uploads/${savedFileName}`,
+      fileName: savedFileName,
+      fileSize,
+    };
+  }
+
+  // Upload a single inline image for story middle
+  app.post('/api/articles/upload-inline-image', (req, res) => {
+    try {
+      const { imageData, imageUrl, fileName, caption, altText, title, article_id, position } = req.body;
+      if ((!imageData || typeof imageData !== 'string') && (!imageUrl || typeof imageUrl !== 'string')) {
+        res.status(400).json({ success: false, error: 'No image data or image URL provided.' });
+        return;
+      }
+
+      let finalUrl = '';
+      let finalFileName = fileName || 'inline-photo.jpg';
+      let fileSize = 'Online Image';
+
+      if (imageData && typeof imageData === 'string') {
+        const saved = saveStoryInlineImage(imageData, fileName);
+        finalUrl = saved.url;
+        finalFileName = saved.fileName;
+        fileSize = saved.fileSize;
+      } else if (imageUrl && typeof imageUrl === 'string') {
+        finalUrl = imageUrl.trim();
+      }
+
+      const cap = caption ? String(caption).trim() : '';
+
+      // Also register into mediaStore so author can reuse it
+      const newAsset: MediaAsset = {
+        id: `media-inline-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        title: title || cap || finalFileName,
+        url: finalUrl,
+        data_url: imageData || undefined,
+        is_uploaded: Boolean(imageData),
+        category: 'STORY_INLINE',
+        caption: cap || undefined,
+        alt_text: altText || cap || undefined,
+        tags: ['INLINE', 'STORY', 'EDITORIAL'],
+        file_size: fileSize,
+        uploaded_at: new Date().toISOString(),
+        source: 'Story Middle Inline Upload',
+      };
+      mediaStore.unshift(newAsset);
+      saveStoresToDisk();
+
+      const markdown = cap ? `![${cap}](${finalUrl})` : `![Story photo](${finalUrl})`;
+      const htmlSnippet = `<figure class="story-inline-image" data-layout="single-image" contenteditable="false" style="margin: 18px 0; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 4px; overflow: hidden; display: block; user-select: none;">
+        <img src="${finalUrl}" alt="${cap || ''}" style="width: 100%; max-height: 480px; object-fit: cover; display: block;" />
+        ${cap ? `<figcaption style="padding: 6px 12px; font-size: 11px; font-style: italic; color: #475569; background: #F1F5F9; border-top: 1px solid #CBD5E1;">📷 ${cap}</figcaption>` : ''}
+      </figure>`;
+
+      // If article_id was supplied, automatically insert into article body
+      let updatedArticle: Article | undefined = undefined;
+      if (article_id) {
+        const target = articlesStore.find((a) => String(a.article_id) === String(article_id));
+        if (target) {
+          target.body = insertImageIntoStoryBody(target.body, markdown, position || 'middle');
+          target.inline_images = extractStoryInlineImages(target.body);
+          (target as any).last_edited_at = new Date().toISOString();
+          saveStoresToDisk();
+          updatedArticle = target;
+        }
+      }
+
+      res.json({
+        success: true,
+        url: finalUrl,
+        fileName: finalFileName,
+        caption: cap,
+        altText: altText || cap,
+        markdown,
+        htmlSnippet,
+        article: updatedArticle,
+        message: 'Inline image uploaded and prepared successfully!',
+      });
+    } catch (err: any) {
+      console.warn('[Inline Image Upload Error]:', err);
+      res.status(500).json({ success: false, error: err?.message || 'Failed to upload inline image' });
+    }
+  });
+
+  // Upload two images side-by-side for story middle
+  app.post('/api/articles/upload-side-by-side', (req, res) => {
+    try {
+      const { image1, image2, overallCaption, article_id, position } = req.body;
+      if (!image1 || !image2) {
+        res.status(400).json({ success: false, error: 'Both image1 and image2 must be provided.' });
+        return;
+      }
+
+      let url1 = image1.imageUrl || '';
+      let url2 = image2.imageUrl || '';
+      let size1 = 'Online Image';
+      let size2 = 'Online Image';
+
+      if (image1.imageData) {
+        const saved1 = saveStoryInlineImage(image1.imageData, image1.fileName || 'left-image.jpg');
+        url1 = saved1.url;
+        size1 = saved1.fileSize;
+      }
+      if (image2.imageData) {
+        const saved2 = saveStoryInlineImage(image2.imageData, image2.fileName || 'right-image.jpg');
+        url2 = saved2.url;
+        size2 = saved2.fileSize;
+      }
+
+      if (!url1 || !url2) {
+        res.status(400).json({ success: false, error: 'Both left and right image URLs or image data must be provided.' });
+        return;
+      }
+
+      const cap1 = image1.caption ? String(image1.caption).trim() : 'Photo 1';
+      const cap2 = image2.caption ? String(image2.caption).trim() : 'Photo 2';
+      const grpCap = overallCaption ? String(overallCaption).trim() : '';
+
+      // Save both into mediaStore
+      const asset1: MediaAsset = {
+        id: `media-sbs1-${Date.now()}`,
+        title: cap1 || 'Side-by-Side Left Photo',
+        url: url1,
+        data_url: image1.imageData || undefined,
+        is_uploaded: Boolean(image1.imageData),
+        category: 'STORY_SIDE_BY_SIDE',
+        caption: cap1,
+        tags: ['SIDE_BY_SIDE', 'LEFT', 'EDITORIAL'],
+        file_size: size1,
+        uploaded_at: new Date().toISOString(),
+        source: 'Story Side-by-Side Upload',
+      };
+      const asset2: MediaAsset = {
+        id: `media-sbs2-${Date.now()}`,
+        title: cap2 || 'Side-by-Side Right Photo',
+        url: url2,
+        data_url: image2.imageData || undefined,
+        is_uploaded: Boolean(image2.imageData),
+        category: 'STORY_SIDE_BY_SIDE',
+        caption: cap2,
+        tags: ['SIDE_BY_SIDE', 'RIGHT', 'EDITORIAL'],
+        file_size: size2,
+        uploaded_at: new Date().toISOString(),
+        source: 'Story Side-by-Side Upload',
+      };
+      mediaStore.unshift(asset1, asset2);
+      saveStoresToDisk();
+
+      const capAttr = grpCap ? ` caption="${grpCap}"` : '';
+      const markdown = `:::side-by-side${capAttr}\n![${cap1}](${url1})\n![${cap2}](${url2})\n:::`;
+
+      const overallHeader = grpCap
+        ? `<div style="grid-column: span 2; font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0284C7; font-family: monospace; padding-bottom: 6px; border-bottom: 1px solid #E2E8F0; margin-bottom: 8px;">📷 ${grpCap}</div>`
+        : '';
+      const htmlSnippet = `<div class="story-images-grid-2" data-layout="side-by-side"${grpCap ? ` data-caption="${grpCap.replace(/"/g, '&quot;')}"` : ''} contenteditable="false" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; padding: 12px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 4px; user-select: none;">
+        ${overallHeader}
+        <figure style="margin: 0; display: flex; flex-direction: column;">
+          <img src="${url1}" alt="${cap1}" style="width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 2px; border: 1px solid #CBD5E1;" />
+          ${cap1 ? `<figcaption style="font-size: 11px; font-style: italic; color: #64748B; margin-top: 4px;">${cap1}</figcaption>` : ''}
+        </figure>
+        <figure style="margin: 0; display: flex; flex-direction: column;">
+          <img src="${url2}" alt="${cap2}" style="width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 2px; border: 1px solid #CBD5E1;" />
+          ${cap2 ? `<figcaption style="font-size: 11px; font-style: italic; color: #64748B; margin-top: 4px;">${cap2}</figcaption>` : ''}
+        </figure>
+      </div>`;
+
+      // If article_id was supplied, automatically insert into article body
+      let updatedArticle: Article | undefined = undefined;
+      if (article_id) {
+        const target = articlesStore.find((a) => String(a.article_id) === String(article_id));
+        if (target) {
+          target.body = insertImageIntoStoryBody(target.body, markdown, position || 'middle');
+          target.inline_images = extractStoryInlineImages(target.body);
+          (target as any).last_edited_at = new Date().toISOString();
+          saveStoresToDisk();
+          updatedArticle = target;
+        }
+      }
+
+      res.json({
+        success: true,
+        image1: { url: url1, caption: cap1 },
+        image2: { url: url2, caption: cap2 },
+        overallCaption: grpCap,
+        markdown,
+        htmlSnippet,
+        article: updatedArticle,
+        message: 'Side-by-side images uploaded and formatted successfully!',
+      });
+    } catch (err: any) {
+      console.warn('[Side-by-Side Upload Error]:', err);
+      res.status(500).json({ success: false, error: err?.message || 'Failed to upload side-by-side images' });
+    }
+  });
+
+  // Dedicated endpoint: insert 1 single image directly into any existing article
+  app.post('/api/articles/:id/insert-inline-image', (req, res) => {
+    try {
+      const targetIdStr = String(req.params.id);
+      const target = articlesStore.find((a) => String(a.article_id) === targetIdStr || a.slug === targetIdStr);
+      if (!target) {
+        res.status(404).json({ success: false, error: 'Article not found in database.' });
+        return;
+      }
+
+      const { imageData, imageUrl, caption, position } = req.body;
+      let finalUrl = imageUrl || '';
+
+      if (imageData && typeof imageData === 'string') {
+        const saved = saveStoryInlineImage(imageData);
+        finalUrl = saved.url;
+      }
+
+      if (!finalUrl) {
+        res.status(400).json({ success: false, error: 'Image URL or image data is required.' });
+        return;
+      }
+
+      const cap = caption ? String(caption).trim() : '';
+      const markdown = cap ? `![${cap}](${finalUrl})` : `![Story photo](${finalUrl})`;
+
+      target.body = insertImageIntoStoryBody(target.body, markdown, position || 'middle');
+      target.inline_images = extractStoryInlineImages(target.body);
+      (target as any).last_edited_at = new Date().toISOString();
+      saveStoresToDisk();
+
+      res.json({
+        success: true,
+        message: `Image inserted into middle of story #${target.article_id} successfully!`,
+        article: target,
+        insertedImage: { url: finalUrl, caption: cap },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Failed to insert image' });
+    }
+  });
+
+  // Dedicated endpoint: insert 2 images side-by-side into any existing article
+  app.post('/api/articles/:id/insert-side-by-side', (req, res) => {
+    try {
+      const targetIdStr = String(req.params.id);
+      const target = articlesStore.find((a) => String(a.article_id) === targetIdStr || a.slug === targetIdStr);
+      if (!target) {
+        res.status(404).json({ success: false, error: 'Article not found in database.' });
+        return;
+      }
+
+      const { image1, image2, overallCaption, position } = req.body;
+      if (!image1 || !image2) {
+        res.status(400).json({ success: false, error: 'Both image1 and image2 are required.' });
+        return;
+      }
+
+      let url1 = image1.imageUrl || '';
+      let url2 = image2.imageUrl || '';
+
+      if (image1.imageData) {
+        const s1 = saveStoryInlineImage(image1.imageData, image1.fileName || 'side1.jpg');
+        url1 = s1.url;
+      }
+      if (image2.imageData) {
+        const s2 = saveStoryInlineImage(image2.imageData, image2.fileName || 'side2.jpg');
+        url2 = s2.url;
+      }
+
+      if (!url1 || !url2) {
+        res.status(400).json({ success: false, error: 'Both left and right image sources must be provided.' });
+        return;
+      }
+
+      const cap1 = image1.caption ? String(image1.caption).trim() : 'Photo 1';
+      const cap2 = image2.caption ? String(image2.caption).trim() : 'Photo 2';
+      const grpCap = overallCaption ? String(overallCaption).trim() : '';
+      const capAttr = grpCap ? ` caption="${grpCap}"` : '';
+
+      const markdown = `:::side-by-side${capAttr}\n![${cap1}](${url1})\n![${cap2}](${url2})\n:::`;
+
+      target.body = insertImageIntoStoryBody(target.body, markdown, position || 'middle');
+      target.inline_images = extractStoryInlineImages(target.body);
+      (target as any).last_edited_at = new Date().toISOString();
+      saveStoresToDisk();
+
+      res.json({
+        success: true,
+        message: `2 images side by side inserted into middle of story #${target.article_id} successfully!`,
+        article: target,
+        insertedSideBySide: {
+          image1: { url: url1, caption: cap1 },
+          image2: { url: url2, caption: cap2 },
+          overallCaption: grpCap,
+        },
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || 'Failed to insert side-by-side images' });
+    }
+  });
+
+  // Get all images (featured, middle inline, side-by-side) for an article
+  app.get('/api/articles/:id/images', (req, res) => {
+    const targetIdStr = String(req.params.id);
+    const target = articlesStore.find((a) => String(a.article_id) === targetIdStr || a.slug === targetIdStr);
+    if (!target) {
+      res.status(404).json({ success: false, error: 'Article not found.' });
+      return;
+    }
+
+    const inlineImgs = extractStoryInlineImages(target.body);
+    res.json({
+      success: true,
+      article_id: target.article_id,
+      title: target.title,
+      featured_image: target.featured_image_url ? { url: target.featured_image_url, caption: target.image_caption } : null,
+      middle_images: inlineImgs,
+      total_count: (target.featured_image_url ? 1 : 0) + inlineImgs.length,
+    });
   });
 
   app.post('/api/media/add', (req, res) => {
@@ -7098,27 +7803,46 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
 
   function getArticleForRequest(req: express.Request) {
     const articleParam =
+      (req.query.id as string) ||
       (req.query.article as string) ||
       (req.query.story as string) ||
-      (req.query.id as string);
+      (req.query.slug as string);
 
     let identifier = articleParam ? articleParam.trim() : null;
 
     if (!identifier) {
-      const match = req.path.match(/^\/(?:story|article)\/([^/?#]+)/i);
+      const match = req.path.match(/^\/(?:story|article|news)\/([^/?#]+)/i);
       if (match && match[1]) {
-        identifier = decodeURIComponent(match[1].trim());
+        identifier = match[1].trim();
       }
     }
 
     if (!identifier) return null;
 
-    return articlesStore.find(
-      (a) =>
-        String(a.article_id) === identifier ||
-        a.slug === identifier ||
-        (a.slug && a.slug.toLowerCase() === identifier.toLowerCase())
-    );
+    let decoded = identifier;
+    try {
+      decoded = decodeURIComponent(identifier).trim();
+    } catch {
+      decoded = identifier;
+    }
+    const cleanLower = decoded.toLowerCase();
+    const cleanNoHyphens = cleanLower.replace(/[^a-z0-9]/g, '');
+
+    const matcher = (a: Article) => {
+      const aId = String(a.article_id);
+      const aSlug = (a.slug || '').toLowerCase();
+      const aSlugNoHyphens = aSlug.replace(/[^a-z0-9]/g, '');
+
+      return (
+        aId === identifier ||
+        aId === decoded ||
+        aSlug === cleanLower ||
+        (cleanNoHyphens && aSlugNoHyphens === cleanNoHyphens) ||
+        (a.title && a.title.toLowerCase() === cleanLower)
+      );
+    };
+
+    return articlesStore.find(matcher) || INITIAL_ARTICLES.find(matcher) || null;
   }
 
   function injectArticleMetaTags(html: string, article: Article, req: express.Request): string {

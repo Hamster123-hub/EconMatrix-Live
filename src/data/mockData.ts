@@ -239,7 +239,7 @@ export const INITIAL_ARTICLES: Article[] = [
     "title": "Hambantota Port Surpasses One-Million Container Milestone",
     "slug": "hambantota-port-surpasses-one-million-container-milestone",
     "deck": "Hambantota Port Surpasses One-Million Container Milestone",
-    "body": "ECONMATRIX - Hambantota International Port has surpassed the one-million container milestone, having handled ***1,002,232 ***twenty-foot equivalent units (TEUs) from 2025 to date.\n\nAchieving rapid growth following the commencement of quay crane operations in 2025, Hambantota Port handled 428,036 TEUs in 2025 and 574,196 TEUs so far in 2026, the port stated in an official announcement.\n\nCommenting on this expansion, Wilson Zhu, Chief Executive Officer of Hambantota International Port Group (HIPG), noted that crossing the one-million TEU mark is a significant milestone for the port, and steps are underway to expand the port's entire operational ecosystem driven by the trust placed by customers and shipping lines.\n\nTo effectively accommodate rising container capacity, a comprehensive USD 108 million investment program is being executed. Under this initiative, 6 new quay cranes and 16 rubber-tyred gantry (RTG) cranes are scheduled to be commissioned into operation by February 2027.\n\nFurthermore, with the addition of another 1,300-meter berth, the port’s total container quay line will reach nearly 2 kilometers, according to the release.\nThe port’s container yard capacity will also be expanded by 30%, alongside upgrades to refrigerated container (reefer) facilities. (Colombo/October 04/2026)",
+    "body": "ECONMATRIX - Hambantota International Port has surpassed the one-million container milestone, having handled ***1,002,232 ***twenty-foot equivalent units (TEUs) from 2025 to date.\n\nAchieving rapid growth following the commencement of quay crane operations in 2025, Hambantota Port handled 428,036 TEUs in 2025 and 574,196 TEUs so far in 2026, the port stated in an official announcement.\n\n:::side-by-side caption=\"Maritime Infrastructure: Colombo Eastern Container Terminal vs Hambantota Deep Water Berths\"\n![Colombo Port ECT quay crane and container vessel handling](https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1200&q=80)\n![Hambantota International Port container throughput yard](https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80)\n:::\n\nCommenting on this expansion, Wilson Zhu, Chief Executive Officer of Hambantota International Port Group (HIPG), noted that crossing the one-million TEU mark is a significant milestone for the port, and steps are underway to expand the port's entire operational ecosystem driven by the trust placed by customers and shipping lines.\n\nTo effectively accommodate rising container capacity, a comprehensive USD 108 million investment program is being executed. Under this initiative, 6 new quay cranes and 16 rubber-tyred gantry (RTG) cranes are scheduled to be commissioned into operation by February 2027.\n\nFurthermore, with the addition of another 1,300-meter berth, the port’s total container quay line will reach nearly 2 kilometers, according to the release.\nThe port’s container yard capacity will also be expanded by 30%, alongside upgrades to refrigerated container (reefer) facilities. (Colombo/October 04/2026)",
     "primary_category": "ECONOMY",
     "status": "published",
     "is_lead_story": true,
@@ -268,6 +268,20 @@ export const INITIAL_ARTICLES: Article[] = [
     "notable_position": "none",
     "is_notable": false,
     "is_spotlight": false,
+    "inline_images": [
+      {
+        "type": "side-by-side",
+        "overallCaption": "Maritime Infrastructure: Colombo Eastern Container Terminal vs Hambantota Deep Water Berths",
+        "image1": {
+          "url": "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1200&q=80",
+          "caption": "Colombo Port ECT quay crane and container vessel handling"
+        },
+        "image2": {
+          "url": "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80",
+          "caption": "Hambantota International Port container throughput yard"
+        }
+      }
+    ],
     "last_edited_by": "Ranul (Company Owner & Publisher)",
     "last_edited_at": "2026-10-04T06:37:23.419Z"
   },
@@ -276,7 +290,7 @@ export const INITIAL_ARTICLES: Article[] = [
     "title": "IMF Affirms Sri Lanka Reform Program on Track as 85% of Targets Met",
     "slug": "imf-affirms-sri-lanka-reform-program-on-track-as-85-of-targets-met",
     "deck": "IMF Affirms Sri Lanka Reform Program on Track as 85% of Targets Met",
-    "body": "ECONMATRIX - Sri Lanka’s Extended Fund Facility arrangement with the International Monetary Fund remains on course despite the absence of an immediate staff-level agreement, according to IMF Resident Representative Martha Tesfaye Woldemichael.\n\nSpeaking at the Sampath Bank Economic Forum 2026, Woldemichael explained that finalizing key policy benchmarks under the ongoing seventh review naturally requires additional negotiation time.\n\nSri Lanka has already fulfilled approximately 85 percent of its program targets, marking significant progress in its shift from crisis stabilization to sustainable growth.\nThe next phase requires deeper structural transformation. Woldemichael highlighted the need for reforms that improve the local business environment, attract foreign investment, and expand export capacity.\n\nHowever, she raised concerns over proposed revisions to the country’s Anti-Corruption Act. While acknowledging the value of reviewing laws based on practical enforcement, she cautioned that certain amendments could compromise transparency, particularly regarding public access to asset declarations and redaction standards.\n\nThe forum also featured perspectives from Central Bank of Sri Lanka Governor P. Nandalal Weerasinghe and Sampath Bank Independent Non-Executive Director Hiran Cabraal, in a panel moderated by the bank’s Chief Economist, Tharindu Abeywardana.\n\nSampath Bank Managing Director and Chief Executive Officer Sanjaya Gunawardana concluded the session by emphasizing that securing lasting economic momentum will depend on collective action across both the public and private sectors.(Colombo/October 04/2026)",
+    "body": "ECONMATRIX - Sri Lanka’s Extended Fund Facility arrangement with the International Monetary Fund remains on course despite the absence of an immediate staff-level agreement, according to IMF Resident Representative Martha Tesfaye Woldemichael.\n\nSpeaking at the Sampath Bank Economic Forum 2026, Woldemichael explained that finalizing key policy benchmarks under the ongoing seventh review naturally requires additional negotiation time.\n\n![Central Bank Governor and Ministry of Finance officials conferring at the Sampath Bank Economic Forum](https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80)\n\nSri Lanka has already fulfilled approximately 85 percent of its program targets, marking significant progress in its shift from crisis stabilization to sustainable growth.\nThe next phase requires deeper structural transformation. Woldemichael highlighted the need for reforms that improve the local business environment, attract foreign investment, and expand export capacity.\n\nHowever, she raised concerns over proposed revisions to the country’s Anti-Corruption Act. While acknowledging the value of reviewing laws based on practical enforcement, she cautioned that certain amendments could compromise transparency, particularly regarding public access to asset declarations and redaction standards.\n\nThe forum also featured perspectives from Central Bank of Sri Lanka Governor P. Nandalal Weerasinghe and Sampath Bank Independent Non-Executive Director Hiran Cabraal, in a panel moderated by the bank’s Chief Economist, Tharindu Abeywardana.\n\nSampath Bank Managing Director and Chief Executive Officer Sanjaya Gunawardana concluded the session by emphasizing that securing lasting economic momentum will depend on collective action across both the public and private sectors.(Colombo/October 04/2026)",
     "primary_category": "ECONOMY",
     "status": "published",
     "is_lead_story": false,
@@ -288,6 +302,13 @@ export const INITIAL_ARTICLES: Article[] = [
     "view_count": 1,
     "published_at": "2026-10-04T05:50:01.510Z",
     "created_at": "2026-10-04T05:50:01.511Z",
+    "inline_images": [
+      {
+        "type": "single",
+        "url": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80",
+        "caption": "Central Bank Governor and Ministry of Finance officials conferring at the Sampath Bank Economic Forum"
+      }
+    ],
     "authors": [
       {
         "author_id": 100,
