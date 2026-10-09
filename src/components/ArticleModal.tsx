@@ -409,6 +409,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                   article_id: article.article_id,
                   slug: article.slug,
                   title: displayTitle,
+                  featured_image_url: article.featured_image_url,
+                  deck: article.deck,
                 })}
                 onClick={(e) => {
                   e.preventDefault();
@@ -416,6 +418,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                     article_id: article.article_id,
                     slug: article.slug,
                     title: displayTitle,
+                    featured_image_url: article.featured_image_url,
+                    deck: article.deck,
                   });
                 }}
                 target="_blank"

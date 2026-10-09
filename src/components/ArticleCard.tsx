@@ -333,6 +333,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
                     article_id: article.article_id,
                     slug: article.slug,
                     title: displayTitle,
+                    featured_image_url: article.featured_image_url,
+                    deck: article.deck,
                   });
                 }}
                 className={`flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase transition cursor-pointer border rounded-xs ${

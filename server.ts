@@ -636,6 +636,21 @@ function loadStoresFromDisk() {
           if (updated.featured_image_url && updated.featured_image_url.includes('photo-1545324418-cc1a3fa10c00')) {
             updated.featured_image_url = 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80';
           }
+          // Self-heal any broken or unpersisted local /uploads/ images across restarts
+          if (updated.featured_image_url && updated.featured_image_url.startsWith('/uploads/')) {
+            const fileName = path.basename(updated.featured_image_url);
+            const diskPath = path.join(UPLOADS_DIR, fileName);
+            if (!fs.existsSync(diskPath)) {
+              const initMatch = INITIAL_ARTICLES.find(init => String(init.article_id) === String(updated.article_id));
+              if (initMatch && initMatch.featured_image_url && initMatch.featured_image_url.startsWith('http')) {
+                updated.featured_image_url = initMatch.featured_image_url;
+              } else if (updated.inline_images && updated.inline_images.length > 0 && updated.inline_images[0]?.url) {
+                updated.featured_image_url = updated.inline_images[0].url;
+              } else {
+                updated.featured_image_url = 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
+              }
+            }
+          }
           updated.inline_images = (updated.inline_images && updated.inline_images.length > 0)
             ? updated.inline_images
             : extractStoryInlineImages(updated.body);
@@ -1068,10 +1083,22 @@ async function startServer() {
         res.setHeader('Content-Type', mimeType);
         return res.send(buffer);
       } catch (err) {
-        return next();
+        // Fall through to fallback
       }
     }
-    next();
+    // Check if any article in articlesStore references this upload
+    const linkedArticle = articlesStore.find((a) => (a.featured_image_url || '').includes(fileName)) ||
+      INITIAL_ARTICLES.find((a) => (a.featured_image_url || '').includes(fileName));
+    if (linkedArticle && linkedArticle.inline_images && linkedArticle.inline_images.length > 0) {
+      const inlineUrl = linkedArticle.inline_images[0].url || linkedArticle.inline_images[0].image1?.url;
+      if (inlineUrl && inlineUrl.startsWith('http')) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.redirect(302, inlineUrl);
+      }
+    }
+    // Always return a valid image redirect for missing upload files - never fall through to HTML!
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.redirect(302, 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80');
   });
 
   // Security Headers & Hardening Middleware
@@ -7975,9 +8002,100 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
     res.json({ success: true, message: 'Stripe Webhook processed & posted to Automated Accounting Ledger.', txRef });
   });
 
+  // Dedicated Binary Endpoint for Article OpenGraph & WhatsApp Images
+  app.get(['/api/articles/:id/og-image', '/story/:id/og-image'], (req, res) => {
+    const idOrSlug = req.params.id;
+    const matcher = (a: Article) =>
+      String(a.article_id) === idOrSlug ||
+      (a.slug && a.slug.toLowerCase() === idOrSlug.toLowerCase()) ||
+      (a.slug && a.slug.replace(/[^a-z0-9]/gi, '') === idOrSlug.replace(/[^a-z0-9]/gi, ''));
+
+    const article = articlesStore.find(matcher) || INITIAL_ARTICLES.find(matcher);
+    let img = (article?.featured_image_url || '').trim();
+
+    if (!img && article?.inline_images && article.inline_images.length > 0) {
+      img = article.inline_images[0].url || article.inline_images[0].image1?.url || '';
+    }
+    if (!img && article?.gallery && article.gallery.length > 0) {
+      img = article.gallery[0] || '';
+    }
+    if (!img) {
+      img = 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
+    }
+
+    // 1. Base64 data URI
+    if (img.startsWith('data:image/')) {
+      const match = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+      if (match) {
+        const mime = `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`;
+        const buffer = Buffer.from(match[2], 'base64');
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Content-Length', buffer.length);
+        return res.send(buffer);
+      }
+    }
+
+    // 2. Local uploads path
+    if (img.startsWith('/uploads/')) {
+      const fileName = path.basename(img);
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.sendFile(filePath);
+      }
+      return res.redirect(302, getCategoryEditorialFallbackImage(article?.primary_category));
+    }
+
+    // 3. Remote URL
+    if (img.startsWith('http://') || img.startsWith('https://')) {
+      return res.redirect(302, img);
+    }
+
+    return res.redirect(302, getCategoryEditorialFallbackImage(article?.primary_category));
+  });
+
+  function getCategoryEditorialFallbackImage(category?: string): string {
+    const cat = (category || '').toUpperCase();
+    if (cat.includes('BANK') || cat.includes('FINANCE') || cat.includes('MONEY') || cat.includes('DEBT')) {
+      return 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (cat.includes('STOCK') || cat.includes('MARKET') || cat.includes('CSE') || cat.includes('TRADING')) {
+      return 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (cat.includes('PORT') || cat.includes('SHIPPING') || cat.includes('LOGISTIC') || cat.includes('TRADE') || cat.includes('MARITIME')) {
+      return 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (cat.includes('TOURISM') || cat.includes('HOSPITALITY') || cat.includes('HOTEL')) {
+      return 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?auto=format&fit=crop&w=1200&q=80';
+    }
+    if (cat.includes('ENERGY') || cat.includes('POWER') || cat.includes('OIL') || cat.includes('FUEL')) {
+      return 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1200&q=80';
+    }
+    return 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
+  }
+
+  function getPublicBaseUrl(req: express.Request): string {
+    const fwdHost = req.get('x-forwarded-host');
+    const fwdProto = req.get('x-forwarded-proto') || 'https';
+    if (fwdHost && !fwdHost.includes('localhost') && !fwdHost.includes('127.0.0.1')) {
+      return `${fwdProto}://${fwdHost}`;
+    }
+    const host = req.get('host');
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1') && !host.includes('0.0.0.0')) {
+      const proto = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+      return `${proto}://${host}`;
+    }
+    if (process.env.APP_URL && process.env.APP_URL.startsWith('http')) {
+      return process.env.APP_URL.replace(/\/+$/, '');
+    }
+    return 'https://ais-dev-dhktrs3fzxd26b6vtickgs-381884245174.asia-east1.run.app';
+  }
+
   function getArticleForRequest(req: express.Request) {
     const articleParam =
       (req.query.id as string) ||
+      (req.query.article_id as string) ||
       (req.query.article as string) ||
       (req.query.story as string) ||
       (req.query.slug as string);
@@ -8012,6 +8130,7 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
         aId === decoded ||
         aSlug === cleanLower ||
         (cleanNoHyphens && aSlugNoHyphens === cleanNoHyphens) ||
+        (cleanNoHyphens && cleanNoHyphens.includes(aId)) ||
         (a.title && a.title.toLowerCase() === cleanLower)
       );
     };
@@ -8020,51 +8139,128 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
   }
 
   function injectArticleMetaTags(html: string, article: Article, req: express.Request): string {
-    const host = req.get('host') || 'econmatrix.lk';
-    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-    const canonicalUrl = `${protocol}://${host}/?article=${encodeURIComponent(article.slug || article.article_id)}`;
+    const baseUrl = getPublicBaseUrl(req);
+    const slugOrId = article.slug || String(article.article_id);
+    const canonicalUrl = `${baseUrl}/story/${encodeURIComponent(slugOrId)}`;
 
-    const safeTitle = (article.title || 'Econ Matrix News')
+    const safeTitle = (article.title || 'LankaEcon News')
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
     const rawDeck = article.deck || article.title;
-    const safeDesc = (rawDeck.length > 200 ? rawDeck.slice(0, 197) + '...' : rawDeck)
+    const safeDesc = (rawDeck.length > 220 ? rawDeck.slice(0, 217) + '...' : rawDeck)
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
 
-    let safeImage = article.featured_image_url || 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
-    if (safeImage.startsWith('/')) {
-      safeImage = `${protocol}://${host}${safeImage}`;
+    // Resolve Image with absolute HTTPS URL
+    let safeImage = '';
+    let rawImage = (article.featured_image_url || '').trim();
+    if (!rawImage && article.inline_images && article.inline_images.length > 0) {
+      rawImage = article.inline_images[0].url || article.inline_images[0].image1?.url || '';
+    }
+    if (!rawImage && article.gallery && article.gallery.length > 0) {
+      rawImage = article.gallery[0] || '';
+    }
+
+    if (rawImage.startsWith('data:image/')) {
+      // WhatsApp CANNOT fetch data: URIs; point to dedicated binary endpoint
+      safeImage = `${baseUrl}/api/articles/${encodeURIComponent(slugOrId)}/og-image`;
+    } else if (rawImage.startsWith('/uploads/')) {
+      const fileName = path.basename(rawImage);
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        safeImage = `${baseUrl}${rawImage}`;
+      } else {
+        // Fall back to category-specific high-resolution photography
+        safeImage = getCategoryEditorialFallbackImage(article.primary_category);
+      }
+    } else if (rawImage.startsWith('/')) {
+      safeImage = `${baseUrl}${rawImage}`;
+    } else if (rawImage.startsWith('http://') || rawImage.startsWith('https://')) {
+      safeImage = rawImage;
+    } else {
+      safeImage = getCategoryEditorialFallbackImage(article.primary_category);
+    }
+
+    let imageMimeType = 'image/jpeg';
+    if (/\.png($|\?)/i.test(safeImage) || safeImage.includes('format=png')) {
+      imageMimeType = 'image/png';
+    } else if (/\.webp($|\?)/i.test(safeImage) || safeImage.includes('format=webp')) {
+      imageMimeType = 'image/webp';
     }
 
     let modified = html;
-    modified = modified.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle} - Econ Matrix</title>`);
+    modified = modified.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle} - LankaEcon</title>`);
     if (/<meta\s+name=["']description["'][^>]*>/i.test(modified)) {
       modified = modified.replace(/<meta\s+name=["']description["'][^>]*>/i, `<meta name="description" content="${safeDesc}" />`);
     }
 
     modified = modified.replace(/<meta\s+property=["']og:[^"']+["'][^>]*>/gi, '');
     modified = modified.replace(/<meta\s+name=["']twitter:[^"']+["'][^>]*>/gi, '');
+    modified = modified.replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '');
+    modified = modified.replace(/<link\s+rel=["']image_src["'][^>]*>/gi, '');
+    modified = modified.replace(/<meta\s+itemprop=["']image["'][^>]*>/gi, '');
 
     const ogTags = `
     <!-- Dynamic OpenGraph & WhatsApp Social Share Cards -->
     <meta property="og:type" content="article" />
-    <meta property="og:site_name" content="Econ Matrix" />
+    <meta property="og:site_name" content="LankaEcon" />
     <meta property="og:title" content="${safeTitle}" />
     <meta property="og:description" content="${safeDesc}" />
+    <meta property="og:url" content="${canonicalUrl}" />
+    <link rel="canonical" href="${canonicalUrl}" />
+
+    <!-- WhatsApp, iMessage & OpenGraph Featured Image -->
     <meta property="og:image" content="${safeImage}" />
+    <meta property="og:image:secure_url" content="${safeImage}" />
+    <meta property="og:image:type" content="${imageMimeType}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:url" content="${canonicalUrl}" />
+    <meta property="og:image:alt" content="${safeTitle}" />
+
+    <!-- Universal Messaging & Mobile Scrapers -->
+    <link rel="image_src" href="${safeImage}" />
+    <meta itemprop="image" content="${safeImage}" />
+
+    <!-- Twitter / X Cards -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lankaecon" />
     <meta name="twitter:title" content="${safeTitle}" />
     <meta name="twitter:description" content="${safeDesc}" />
     <meta name="twitter:image" content="${safeImage}" />
+
+    <!-- Schema.org JSON-LD for Search & Messaging Crawlers -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "headline": ${JSON.stringify(article.title || safeTitle)},
+      "description": ${JSON.stringify(rawDeck || safeDesc)},
+      "image": [${JSON.stringify(safeImage)}],
+      "datePublished": ${JSON.stringify(article.published_at || new Date().toISOString())},
+      "dateModified": ${JSON.stringify(article.last_edited_at || article.published_at || new Date().toISOString())},
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": ${JSON.stringify(canonicalUrl)}
+      },
+      "author": {
+        "@type": "Person",
+        "name": ${JSON.stringify(article.authors?.[0] ? `${article.authors[0].first_name} ${article.authors[0].last_name}`.trim() : 'LankaEcon Desk')}
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "LankaEcon",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=600&q=80"
+        }
+      }
+    }
+    </script>
   </head>`;
 
     modified = modified.replace(/<\/head>/i, ogTags);
@@ -8078,13 +8274,22 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
       appType: 'spa',
     });
 
-    // Crawler / Social Share card interceptor for dev & live testing
+    // Universal Article Server-Side Pre-renderer & OpenGraph / WhatsApp Injector
     app.use(async (req, res, next) => {
-      const userAgent = req.get('user-agent') || '';
-      const isCrawler = /WhatsApp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot/i.test(userAgent);
-      const article = getArticleForRequest(req);
+      // Don't intercept API routes, static assets, or Vite internal files
+      if (
+        req.path.startsWith('/api') ||
+        req.path.startsWith('/uploads') ||
+        req.path.startsWith('/@') ||
+        req.path.startsWith('/node_modules') ||
+        req.path.startsWith('/src') ||
+        /\.(js|ts|tsx|jsx|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i.test(req.path)
+      ) {
+        return next();
+      }
 
-      if (article && (isCrawler || req.query.crawler === 'true')) {
+      const article = getArticleForRequest(req);
+      if (article) {
         const indexPath = path.join(process.cwd(), 'index.html');
         if (fs.existsSync(indexPath)) {
           let rawHtml = fs.readFileSync(indexPath, 'utf-8');
@@ -8093,8 +8298,8 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
           } catch {}
           const modified = injectArticleMetaTags(rawHtml, article, req);
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          res.send(modified);
-          return;
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          return res.send(modified);
         }
       }
       next();
@@ -8121,8 +8326,7 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
         const rawHtml = fs.readFileSync(indexPath, 'utf-8');
         const modified = injectArticleMetaTags(rawHtml, article, req);
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.send(modified);
-        return;
+        return res.send(modified);
       }
       res.sendFile(indexPath);
     });

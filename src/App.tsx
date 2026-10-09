@@ -449,6 +449,7 @@ export default function App() {
             }}
             relatedArticles={articles.filter((a) => a.article_id !== selectedArticle.article_id)}
             onSelectArticle={handleSelectArticle}
+            onOpenIgStory={handleOpenIgStory}
           />
         ) : activeTab === 'econ_academy' ? (
           <EconAcademySection language={language} />

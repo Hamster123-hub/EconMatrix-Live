@@ -113,6 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'OPINION', label: getUIText('tabOpinion', language) },
     { id: 'WORLD', label: getUIText('tabWorld', language) },
     { id: 'econ_academy', label: getUIText('tabEconAcademy', language), icon: BookOpen },
+    { id: 'summary_story', label: 'Story Studio', icon: Instagram },
     /* { id: 'lanka_ink', label: getUIText('tabLankaInk', language), icon: Feather }, - hidden for now */
     { id: 'ad_center', label: getUIText('tabAdCenter', language), icon: Megaphone },
     { id: 'contacts', label: getUIText('tabContacts', language), icon: PhoneCall },

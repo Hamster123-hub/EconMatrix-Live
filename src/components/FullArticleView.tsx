@@ -26,6 +26,7 @@ import {
   getArticleShareUrl,
   getWhatsAppShareUrl,
   openWhatsAppShare,
+  shareArticleImageDirect,
   getTwitterShareUrl,
   copyArticleShareUrl,
   shareArticleNativeOrCopy,
@@ -577,6 +578,8 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
                 article_id: article.article_id,
                 slug: article.slug,
                 title: displayTitle,
+                featured_image_url: article.featured_image_url,
+                deck: article.deck,
               })}
               onClick={(e) => {
                 e.preventDefault();
@@ -584,15 +587,40 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
                   article_id: article.article_id,
                   slug: article.slug,
                   title: displayTitle,
+                  featured_image_url: article.featured_image_url,
+                  deck: article.deck,
                 });
               }}
               target="_blank"
               rel="noopener noreferrer"
               className="w-8 h-8 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
-              title="Share on WhatsApp"
+              title="Share on WhatsApp (with rich preview card & image)"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
             </a>
+
+            {article.featured_image_url && (
+              <button
+                onClick={() => {
+                  shareArticleImageDirect({
+                    article_id: article.article_id,
+                    slug: article.slug,
+                    title: displayTitle,
+                    featured_image_url: article.featured_image_url,
+                    deck: article.deck,
+                  });
+                }}
+                className={`px-2.5 py-1.5 rounded-sm text-xs font-bold font-mono flex items-center gap-1 transition cursor-pointer border ${
+                  isNightReader
+                    ? 'bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
+                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                }`}
+                title="Send story image directly to WhatsApp chat"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-current" />
+                <span className="text-[11px]">Send Image</span>
+              </button>
+            )}
 
             <a
               href={getTwitterShareUrl({

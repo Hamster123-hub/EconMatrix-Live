@@ -15,20 +15,30 @@ export interface ShareableArticle {
 }
 
 /**
+ * Returns the effective base origin for sharing.
+ * If running on localhost, checks for configured public production domain.
+ */
+export const getArticleShareOrigin = (): string => {
+  if (typeof window === 'undefined') return '';
+  const winOrigin = window.location.origin;
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const envUrl = (import.meta as any).env?.VITE_APP_URL;
+  if (isLocal && envUrl && typeof envUrl === 'string' && envUrl.startsWith('http')) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  return winOrigin;
+};
+
+/**
  * Returns the canonical, direct share URL for an article.
  * Always includes both the SEO slug and the permanent immutable numeric ID
- * Format: https://domain.com/?article=<slug>&id=<article_id>
+ * Format: https://domain.com/story/<slug>
  */
 export const getArticleShareUrl = (article: { article_id: number | string; slug?: string }): string => {
   if (typeof window === 'undefined') return '';
-  const origin = window.location.origin;
-  const idStr = String(article.article_id);
-  const slugStr = article.slug ? article.slug.trim() : '';
-
-  if (slugStr && slugStr !== idStr) {
-    return `${origin}/?article=${encodeURIComponent(slugStr)}&id=${encodeURIComponent(idStr)}`;
-  }
-  return `${origin}/?article=${encodeURIComponent(idStr)}&id=${encodeURIComponent(idStr)}`;
+  const origin = getArticleShareOrigin();
+  const param = article.slug ? article.slug.trim() : String(article.article_id);
+  return `${origin}/story/${encodeURIComponent(param)}`;
 };
 
 /**
@@ -36,8 +46,8 @@ export const getArticleShareUrl = (article: { article_id: number | string; slug?
  */
 export const getArticlePathUrl = (article: { article_id: number | string; slug?: string }): string => {
   if (typeof window === 'undefined') return '';
-  const origin = window.location.origin;
-  const param = article.slug || String(article.article_id);
+  const origin = getArticleShareOrigin();
+  const param = article.slug ? article.slug.trim() : String(article.article_id);
   return `${origin}/story/${encodeURIComponent(param)}`;
 };
 
@@ -46,13 +56,13 @@ export const getArticlePathUrl = (article: { article_id: number | string; slug?:
  * Uses the universal 'https://wa.me/?text=...' standard, which automatically:
  * - Launches native WhatsApp on iOS and Android smartphones without extra dialogs.
  * - Opens WhatsApp Web or WhatsApp Desktop on desktop browsers.
- * Formats the headline in WhatsApp bold (*Title*) followed by the direct link on its own line
- * to ensure WhatsApp generates a full rich card preview with thumbnail.
+ * Formats the headline in WhatsApp bold (*Title*) followed by the clean direct link on its own line
+ * so WhatsApp's OpenGraph scraper generates a full rich card preview with the article's featured image.
  */
 export const getWhatsAppShareUrl = (article: ShareableArticle): string => {
-  const shareUrl = getArticleShareUrl(article);
+  const shareUrl = getArticlePathUrl(article);
   const title = (article.title || '').trim();
-  const text = `*${title}*\n\nRead full story on EconMatrix:\n${shareUrl}`;
+  const text = `*${title}*\n\n${shareUrl}`;
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 };
 
@@ -62,9 +72,9 @@ export const getWhatsAppShareUrl = (article: ShareableArticle): string => {
  */
 export const openWhatsAppShare = (article: ShareableArticle): void => {
   if (typeof window === 'undefined') return;
-  const shareUrl = getArticleShareUrl(article);
+  const shareUrl = getArticlePathUrl(article);
   const title = (article.title || '').trim();
-  const text = `*${title}*\n\nRead full story on EconMatrix:\n${shareUrl}`;
+  const text = `*${title}*\n\n${shareUrl}`;
   const encodedText = encodeURIComponent(text);
 
   const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -75,6 +85,46 @@ export const openWhatsAppShare = (article: ShareableArticle): void => {
     // Desktop: open WhatsApp Web in new tab
     window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
   }
+};
+
+/**
+ * Shares the actual article featured image file directly to WhatsApp (or native share sheet)
+ * on smartphones, with the story headline and link attached as the image caption.
+ */
+export const shareArticleImageDirect = async (article: ShareableArticle): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+
+  const shareUrl = getArticlePathUrl(article);
+  const title = (article.title || '').trim();
+  const caption = `*${title}*\n\nRead full story: ${shareUrl}`;
+
+  // If browser supports sharing image files via Web Share API (mobile iOS Safari / Android Chrome)
+  if (article.featured_image_url && typeof navigator !== 'undefined' && (navigator as any).share && (navigator as any).canShare) {
+    try {
+      const response = await fetch(article.featured_image_url, { mode: 'cors' });
+      if (response.ok) {
+        const blob = await response.blob();
+        const extension = blob.type.includes('png') ? 'png' : 'jpg';
+        const file = new File([blob], `lankaecon-${article.article_id}.${extension}`, { type: blob.type || 'image/jpeg' });
+
+        if ((navigator as any).canShare({ files: [file] })) {
+          await (navigator as any).share({
+            title,
+            text: caption,
+            files: [file],
+          });
+          return true;
+        }
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return true; // User cancelled share sheet
+      console.warn('Native image file share notice:', err);
+    }
+  }
+
+  // Fallback to standard WhatsApp share link
+  openWhatsAppShare(article);
+  return false;
 };
 
 /**
