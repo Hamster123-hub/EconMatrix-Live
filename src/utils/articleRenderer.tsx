@@ -97,12 +97,53 @@ export const renderArticleParagraph = (text: string, isDarkBg = false): React.Re
   // 3. Strip any orphan/stray asterisks so no stars can ever show on the sides
   processed = processed.replace(/\*{2,4}/g, '');
 
-  // 4. Split by formatting tokens
-  const regex = /(<b\b[^>]*>[\s\S]*?<\/b>|<strong\b[^>]*>[\s\S]*?<\/strong>|<i\b[^>]*>[\s\S]*?<\/i>|<em\b[^>]*>[\s\S]*?<\/em>|\[.*?\]\(.*?\)|\`[^\`]+\`|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
+  // 4. Split by formatting tokens (HTML anchors, bold, italic, markdown links, code, standalone URLs)
+  const regex = /(<a\b[^>]*>[\s\S]*?<\/a>|<b\b[^>]*>[\s\S]*?<\/b>|<strong\b[^>]*>[\s\S]*?<\/strong>|<i\b[^>]*>[\s\S]*?<\/i>|<em\b[^>]*>[\s\S]*?<\/em>|\[.*?\]\(.*?\)|\`[^\`]+\`|https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
   const parts = processed.split(regex);
 
   return parts.map((part, i) => {
     if (!part) return null;
+
+    // HTML Anchor tag <a href="...">...</a>
+    if (/^<a\b[^>]*>[\s\S]*?<\/a>$/i.test(part)) {
+      const hrefMatch = part.match(/href=["'](.*?)["']/i);
+      const innerMatch = part.match(/^<a\b[^>]*>([\s\S]*?)<\/a>$/i);
+      let linkUrl = hrefMatch ? hrefMatch[1].trim() : '#';
+      const linkLabel = innerMatch ? innerMatch[1].trim() : linkUrl;
+
+      if (!linkUrl.startsWith('http://') && !linkUrl.startsWith('https://') && !linkUrl.startsWith('/') && !linkUrl.startsWith('#')) {
+        linkUrl = 'https://' + linkUrl;
+      }
+
+      const isDoc =
+        linkUrl.toLowerCase().includes('.pdf') ||
+        linkUrl.toLowerCase().includes('drive.google.com') ||
+        linkUrl.toLowerCase().includes('docs.google.com') ||
+        linkUrl.toLowerCase().includes('dropbox.com') ||
+        linkUrl.toLowerCase().includes('box.com');
+
+      return (
+        <a
+          key={`anchor-${i}`}
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title={isDoc ? `View source document: ${linkLabel}` : `Open link: ${linkUrl}`}
+          className={`font-semibold underline underline-offset-2 transition-all inline-flex items-center gap-1 mx-0.5 group/link cursor-pointer ${
+            isDarkBg
+              ? 'text-sky-400 hover:text-sky-300 decoration-sky-500/50 hover:decoration-sky-400'
+              : 'text-[#0284C7] hover:text-[#0369A1] decoration-sky-400/60 hover:decoration-[#0284C7]'
+          }`}
+        >
+          {isDoc ? (
+            <FileText className="w-3.5 h-3.5 inline shrink-0 opacity-80 group-hover/link:scale-110 transition-transform" />
+          ) : null}
+          <span>{linkLabel}</span>
+          <ExternalLink className="w-3 h-3 inline shrink-0 opacity-70 group-hover/link:opacity-100 group-hover/link:translate-x-0.5 transition-all" />
+        </a>
+      );
+    }
 
     // Bold tags <b>...</b> or <strong>...</strong>
     if (/^<(b|strong)\b[^>]*>[\s\S]*?<\/\1>$/i.test(part)) {

@@ -16,7 +16,11 @@ import {
   Loader2,
   X,
   Camera,
-  Sparkles
+  Sparkles,
+  Search,
+  ExternalLink,
+  Newspaper,
+  Check
 } from 'lucide-react';
 
 interface RichArticleEditorProps {
@@ -278,6 +282,21 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [publishedArticles, setPublishedArticles] = useState<Array<{ article_id: number | string; title: string; slug?: string; primary_category?: string; published_at?: string }>>([]);
+  const [detectedStory, setDetectedStory] = useState<{ article_id: number | string; title: string; slug?: string; primary_category?: string } | null>(null);
+  const [linkTab, setLinkTab] = useState<'url' | 'stories'>('url');
+  const [storySearchTerm, setStorySearchTerm] = useState('');
+
+  // Fetch published newsroom articles for interlinking
+  useEffect(() => {
+    fetch('/api/articles')
+      .then((r) => r.json())
+      .then((data) => {
+        const list = Array.isArray(data.articles) ? data.articles : Array.isArray(data) ? data : [];
+        if (list.length > 0) setPublishedArticles(list);
+      })
+      .catch(() => {});
+  }, []);
 
   // Single Image Modal State
   const [showSingleImageModal, setShowSingleImageModal] = useState(false);
@@ -330,13 +349,73 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
     onChange(cleanContent);
   }, [onChange]);
 
-  // Save selection before opening modal
+  // Save selection and highlighted word before opening modal
   const saveCurrentSelection = () => {
     if (typeof window === 'undefined') return;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      setSavedSelectionRange(sel.getRangeAt(0));
+    if (mode === 'visual') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        setSavedSelectionRange(range);
+        const highlighted = range.toString().trim();
+        if (highlighted) {
+          setLinkText(highlighted);
+        }
+      }
+    } else {
+      const textarea = sourceTextareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        if (start !== end) {
+          const highlighted = textarea.value.substring(start, end).trim();
+          if (highlighted) {
+            setLinkText(highlighted);
+          }
+        }
+      }
     }
+  };
+
+  const handleLinkUrlChange = (newUrl: string) => {
+    setLinkUrl(newUrl);
+    const clean = newUrl.trim();
+    if (!clean) {
+      setDetectedStory(null);
+      return;
+    }
+
+    // Match story slug, id, or path
+    const storyMatch = clean.match(/(?:\/story\/|\/article\/|\/news\/|\?article=|\?story=|\?id=)([^/?#&\s]+)/i);
+    const candidate = storyMatch ? decodeURIComponent(storyMatch[1].trim()) : clean.replace(/^https?:\/\/[^/]+\/?/i, '').replace(/^\/+/, '');
+    const numericPrefix = candidate.match(/^(\d{10,})/)?.[1];
+
+    if (publishedArticles.length > 0) {
+      const candLower = candidate.toLowerCase();
+      const candNoHyphens = candLower.replace(/[^a-z0-9]/g, '');
+      const match = publishedArticles.find((a) => {
+        const aId = String(a.article_id);
+        const aSlug = (a.slug || '').toLowerCase();
+        const aSlugNoHyphens = aSlug.replace(/[^a-z0-9]/g, '');
+        return (
+          aId === candidate ||
+          (numericPrefix && aId === numericPrefix) ||
+          aSlug === candLower ||
+          (candNoHyphens && aSlugNoHyphens === candNoHyphens) ||
+          (aSlug && candidate.includes(aSlug)) ||
+          a.title.toLowerCase() === candLower ||
+          (candLower.length > 8 && a.title.toLowerCase().includes(candLower))
+        );
+      });
+      if (match) {
+        setDetectedStory(match);
+        if (!linkText.trim() || (detectedStory && linkText === detectedStory.title)) {
+          setLinkText(match.title);
+        }
+        return;
+      }
+    }
+    setDetectedStory(null);
   };
 
   const restoreSelection = () => {
@@ -423,8 +502,11 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
   };
 
   // Apply Single Image Insertion
-  const handleApplySingleImage = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplySingleImage = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
     if (!singleImageUrl.trim()) return;
 
     const url = singleImageUrl.trim();
@@ -445,8 +527,11 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
   };
 
   // Apply Side-by-Side Images Insertion
-  const handleApplySideBySide = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleApplySideBySide = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
     if (!leftImageUrl.trim() || !rightImageUrl.trim()) return;
 
     const url1 = leftImageUrl.trim();
@@ -691,47 +776,87 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
   // HYPERLINK MODAL TRIGGER
   const handleOpenLinkModal = () => {
     saveCurrentSelection();
+    setLinkTab('url');
+    setStorySearchTerm('');
+    if (publishedArticles.length === 0) {
+      fetch('/api/articles')
+        .then((r) => r.json())
+        .then((data) => {
+          const list = Array.isArray(data.articles) ? data.articles : Array.isArray(data) ? data : [];
+          if (list.length > 0) setPublishedArticles(list);
+        })
+        .catch(() => {});
+    }
     setShowLinkModal(true);
   };
 
-  const handleApplyLink = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkUrl.trim()) return;
+  const handleApplyLink = (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+    }
+    const cleanUrlRaw = linkUrl.trim();
+    if (!cleanUrlRaw) return;
 
-    let validUrl = linkUrl.trim();
-    if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://') && !validUrl.startsWith('/') && !validUrl.startsWith('#')) {
+    let validUrl = cleanUrlRaw;
+
+    // Portable canonical path: if user pasted an internal website story URL, convert to clean relative /story/...
+    const siteStoryMatch = validUrl.match(/(?:https?:\/\/[^/]+)?(\/(?:story|article|news)\/[^/?#\s]+)/i);
+    const bareStoryMatch = validUrl.match(/^(?:story|article|news)\/([^/?#\s]+)/i);
+    const numericIdMatch = validUrl.match(/^(\d{10,})$/);
+
+    if (siteStoryMatch && siteStoryMatch[1]) {
+      validUrl = siteStoryMatch[1];
+    } else if (bareStoryMatch && bareStoryMatch[1]) {
+      validUrl = `/story/${bareStoryMatch[1]}`;
+    } else if (numericIdMatch && numericIdMatch[1]) {
+      validUrl = `/story/${numericIdMatch[1]}`;
+    } else if (detectedStory) {
+      validUrl = `/story/${detectedStory.article_id}`;
+    } else if (
+      !validUrl.startsWith('http://') &&
+      !validUrl.startsWith('https://') &&
+      !validUrl.startsWith('/') &&
+      !validUrl.startsWith('#') &&
+      !validUrl.startsWith('mailto:') &&
+      !validUrl.startsWith('tel:')
+    ) {
       validUrl = 'https://' + validUrl;
     }
 
-    if (mode === 'visual') {
-      restoreSelection();
-      if (visualEditorRef.current) visualEditorRef.current.focus();
+    const textToInsert = linkText.trim() || (detectedStory ? detectedStory.title : validUrl);
 
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        document.execCommand('createLink', false, validUrl);
-      } else {
-        const textToInsert = linkText.trim() || validUrl;
-        const linkHtml = `<a href="${validUrl}" target="_blank" rel="noopener noreferrer" style="color: #0284C7; font-weight: 700; text-decoration: underline;">${textToInsert}</a>`;
-        document.execCommand('insertHTML', false, linkHtml);
+    if (mode === 'visual') {
+      if (visualEditorRef.current) {
+        visualEditorRef.current.focus();
+        restoreSelection();
+        const linkHtml = `<a href="${validUrl}" target="_blank" rel="noopener noreferrer" style="color: #0284C7; font-weight: 700; text-decoration: underline;">${textToInsert}</a>&nbsp;`;
+        const inserted = document.execCommand('insertHTML', false, linkHtml);
+        if (!inserted) {
+          visualEditorRef.current.innerHTML += ` <a href="${validUrl}" target="_blank" rel="noopener noreferrer" style="color: #0284C7; font-weight: 700; text-decoration: underline;">${textToInsert}</a> `;
+        }
+        handleVisualInput();
       }
-      handleVisualInput();
     } else {
       const textarea = sourceTextareaRef.current;
       if (textarea) {
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         const orig = textarea.value;
-        const textToUse = linkText.trim() || (start !== end ? orig.substring(start, end) : 'Link Document');
-        const markdown = `[${textToUse}](${validUrl})`;
+        const markdown = `[${textToInsert}](${validUrl})`;
         const updated = orig.substring(0, start) + markdown + orig.substring(end);
         onChange(updated);
+      } else {
+        const markdown = `[${textToInsert}](${validUrl})`;
+        onChange(value ? `${value} ${markdown}` : markdown);
       }
     }
 
     setShowLinkModal(false);
     setLinkUrl('');
     setLinkText('');
+    setDetectedStory(null);
+    setStorySearchTerm('');
   };
 
   // Keyboard shortcuts
@@ -900,6 +1025,15 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
             suppressContentEditableWarning
             onInput={handleVisualInput}
             onKeyDown={handleKeyDown}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              const linkEl = target.closest('a');
+              if (linkEl) {
+                // Prevent browser navigation when clicking links inside the visual editor
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
             style={{ minHeight }}
             data-placeholder={placeholder}
             className="w-full p-4 sm:p-5 text-[15px] sm:text-[16px] font-serif leading-relaxed text-slate-700 outline-none focus:bg-amber-50/5 transition overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:italic empty:before:pointer-events-none 
@@ -969,7 +1103,7 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleApplySingleImage} className="space-y-4">
+            <div className="space-y-4">
               {/* Image Source Selection */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -1145,14 +1279,15 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleApplySingleImage}
                   disabled={!singleImageUrl.trim()}
                   className="px-4 py-1.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider rounded-xs cursor-pointer shadow-xs transition"
                 >
                   Insert Image Into Story
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -1175,7 +1310,7 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleApplySideBySide} className="space-y-4">
+            <div className="space-y-4">
               {/* Overall Group Caption (Optional) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1503,81 +1638,309 @@ export const RichArticleEditor: React.FC<RichArticleEditorProps> = ({
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleApplySideBySide}
                   disabled={!leftImageUrl.trim() || !rightImageUrl.trim()}
                   className="px-4 py-1.5 bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider rounded-xs cursor-pointer shadow-xs transition"
                 >
                   Insert 2 Images Side by Side
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* HYPERLINK INSERTION MODAL */}
+      {/* HYPERLINK & ARTICLE INTERLINKING MODAL */}
       {showLinkModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xs border-2 border-[#0284C7] shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-              <h3 className="font-sans font-black text-slate-900 text-sm flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-[#0284C7]" />
-                <span>Insert Hyperlink or Document Link</span>
-              </h3>
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setShowLinkModal(false)}
+        >
+          <div
+            className="bg-white rounded-xs border-2 border-[#0284C7] shadow-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-sky-100 text-[#0284C7] rounded">
+                  <Link2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-sans font-black text-slate-900 text-sm">
+                    Insert Hyperlink or Link Another Article
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    Link reports, documents, external sites, or stories published on this platform
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowLinkModal(false)}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleApplyLink} className="space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Text to Display in Article:
-                </label>
-                <input
-                  type="text"
-                  value={linkText}
-                  onChange={(e) => setLinkText(e.target.value)}
-                  placeholder="e.g. Official CBSL Communique or Full Report PDF"
-                  className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none"
-                />
-              </div>
+            {/* Mode Tabs */}
+            <div className="flex border-b border-slate-200 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setLinkTab('url')}
+                className={`flex-1 py-2 text-center border-b-2 transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  linkTab === 'url'
+                    ? 'border-[#0284C7] text-[#0284C7] bg-sky-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Paste Link / URL</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLinkTab('stories')}
+                className={`flex-1 py-2 text-center border-b-2 transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  linkTab === 'stories'
+                    ? 'border-[#0284C7] text-[#0284C7] bg-sky-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Newspaper className="w-3.5 h-3.5" />
+                <span>Search Published Stories ({publishedArticles.length})</span>
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Target Web URL or Document Link (https://...): *
-                </label>
-                <input
-                  type="url"
-                  required
-                  autoFocus
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="https://cbsl.gov.lk/report.pdf or https://example.com"
-                  className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none font-mono"
-                />
-              </div>
+            {/* Tab 1: Paste Link / URL */}
+            {linkTab === 'url' ? (
+              <div className="space-y-3.5 text-xs">
+                {/* Detected story banner if matched */}
+                {detectedStory && (
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-emerald-800 font-mono flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span>Platform Story Detected</span>
+                      </span>
+                      <span className="text-[10px] bg-emerald-200/60 text-emerald-900 px-1.5 py-0.2 rounded font-mono font-bold">
+                        #{detectedStory.article_id}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-900 leading-snug">
+                      {detectedStory.title}
+                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+                      <span>Category: <strong className="text-emerald-900">{detectedStory.primary_category || 'ECONOMY'}</strong></span>
+                      {linkText !== detectedStory.title && (
+                        <button
+                          type="button"
+                          onClick={() => setLinkText(detectedStory.title)}
+                          className="text-[#0284C7] hover:underline font-bold cursor-pointer"
+                        >
+                          Use Story Title as Link Text
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLinkModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-xs cursor-pointer font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-[#0284C7] hover:bg-sky-600 text-white font-extrabold text-xs uppercase tracking-wider rounded-xs cursor-pointer shadow-xs transition"
-                >
-                  Insert Link
-                </button>
+                {/* Target Link input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Target Web Address or Article Link *</span>
+                    <span className="text-[10px] text-slate-400 font-mono">e.g. /story/1791... or URL</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={linkUrl}
+                    onChange={(e) => handleLinkUrlChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleApplyLink();
+                      }
+                    }}
+                    placeholder="Paste another article link (/story/1791... or https://...) or external site"
+                    className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none font-mono"
+                  />
+                  
+                  {/* Quick helper controls */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] font-mono text-slate-500">
+                    <span>Quick:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!linkUrl.startsWith('https://') && !linkUrl.startsWith('/story/')) {
+                          setLinkUrl('https://' + linkUrl.replace(/^http:\/\//, ''));
+                        }
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-700 cursor-pointer"
+                    >
+                      https://
+                    </button>
+                    {publishedArticles.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setLinkTab('stories')}
+                        className="px-1.5 py-0.5 bg-sky-50 text-[#0284C7] hover:bg-sky-100 border border-sky-300 rounded cursor-pointer"
+                      >
+                        Browse all stories →
+                      </button>
+                    )}
+                    {linkUrl.trim().length > 4 && (
+                      <a
+                        href={linkUrl.startsWith('/') ? linkUrl : linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto inline-flex items-center gap-1 text-[#0284C7] hover:underline cursor-pointer"
+                      >
+                        <span>Test Link</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Display Text input */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Text to Display in Story (Anchor Text) *</span>
+                    <span className="text-[10px] text-slate-400 font-mono">shows in blue underlined font</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={linkText}
+                    onChange={(e) => setLinkText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleApplyLink();
+                      }
+                    }}
+                    placeholder="e.g. Hambantota Port Surpasses One-Million Container Milestone"
+                    className="w-full bg-slate-50 border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none"
+                  />
+                </div>
+
+                {/* Live Preview Box */}
+                {(linkText || linkUrl) && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xs space-y-1">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                      Live In-Story Preview:
+                    </div>
+                    <p className="text-xs text-slate-800 leading-relaxed">
+                      ...readers will see{' '}
+                      <span className="text-[#0284C7] font-bold underline decoration-sky-300 underline-offset-2 inline-flex items-center gap-0.5">
+                        {linkText || linkUrl}
+                        <ExternalLink className="w-3 h-3 inline text-sky-500" />
+                      </span>{' '}
+                      linking to <code className="text-[10px] text-slate-600 font-mono">{linkUrl || '...'}</code>.
+                    </p>
+                  </div>
+                )}
               </div>
-            </form>
+            ) : (
+              /* Tab 2: Search Published Stories */
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Filter by Headline, Category, or Article ID:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={storySearchTerm}
+                      onChange={(e) => setStorySearchTerm(e.target.value)}
+                      placeholder="Type keywords (e.g. Port, CBSL, IMF, Tea)..."
+                      className="w-full bg-slate-50 border border-slate-300 pl-8 pr-3 py-2 text-xs text-slate-900 focus:bg-white focus:border-[#0284C7] outline-none"
+                    />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xs bg-slate-50/50">
+                  {publishedArticles
+                    .filter((a) => {
+                      if (!storySearchTerm.trim()) return true;
+                      const term = storySearchTerm.toLowerCase();
+                      return (
+                        a.title.toLowerCase().includes(term) ||
+                        String(a.article_id).includes(term) ||
+                        (a.primary_category || '').toLowerCase().includes(term)
+                      );
+                    })
+                    .slice(0, 30)
+                    .map((a) => (
+                      <div
+                        key={a.article_id}
+                        className="p-2.5 hover:bg-sky-50/70 transition flex items-center justify-between gap-3"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9.5px] font-black uppercase tracking-wider bg-slate-200 text-slate-800 px-1 py-0.2 rounded font-mono">
+                              {a.primary_category || 'ECONOMY'}
+                            </span>
+                            <span className="text-[9.5px] text-slate-400 font-mono">
+                              #{a.article_id}
+                            </span>
+                          </div>
+                          <p className="font-bold text-xs text-slate-900 truncate">
+                            {a.title}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLinkUrl(`/story/${a.article_id}`);
+                            if (!linkText.trim() || (detectedStory && linkText === detectedStory.title)) {
+                              setLinkText(a.title);
+                            }
+                            setDetectedStory(a);
+                            setLinkTab('url');
+                          }}
+                          className="shrink-0 px-2.5 py-1 bg-[#0284C7] hover:bg-sky-600 text-white font-bold text-[10.5px] uppercase tracking-wider rounded-xs cursor-pointer shadow-2xs"
+                        >
+                          Select Story
+                        </button>
+                      </div>
+                    ))}
+                  {publishedArticles.length === 0 && (
+                    <div className="p-4 text-center text-slate-400 text-xs">
+                      No published articles loaded yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowLinkModal(false)}
+                className="px-3.5 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xs cursor-pointer font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyLink()}
+                disabled={!linkUrl.trim()}
+                className="px-4 py-2 bg-[#0284C7] hover:bg-sky-600 disabled:opacity-50 text-white font-extrabold text-xs uppercase tracking-wider rounded-xs cursor-pointer shadow-xs transition flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Insert Link into Story</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

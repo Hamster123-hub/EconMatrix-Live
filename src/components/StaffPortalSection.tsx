@@ -134,6 +134,44 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
   const [storyDeck, setStoryDeck] = useState('');
   const [storyCategory, setStoryCategory] = useState('ECONOMY');
   const [storyBody, setStoryBody] = useState('');
+  const [storyImageUrl, setStoryImageUrl] = useState('');
+
+  // Auto-save news draft in localStorage to ensure typed stories are NEVER lost
+  useEffect(() => {
+    if (storyTitle.trim() || storyBody.trim() || storyDeck.trim()) {
+      try {
+        localStorage.setItem(
+          'lankaecon_staff_news_draft',
+          JSON.stringify({
+            title: storyTitle,
+            deck: storyDeck,
+            body: storyBody,
+            category: storyCategory,
+            imageUrl: storyImageUrl,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {}
+    }
+  }, [storyTitle, storyDeck, storyBody, storyCategory, storyImageUrl]);
+
+  // Restore news draft on initial portal load
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('lankaecon_staff_news_draft');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.title || parsed.body) {
+          setStoryTitle((prev) => prev || parsed.title || '');
+          setStoryDeck((prev) => prev || parsed.deck || '');
+          setStoryBody((prev) => prev || parsed.body || '');
+          if (parsed.category) setStoryCategory((prev) => prev || parsed.category);
+          if (parsed.imageUrl) setStoryImageUrl((prev) => prev || parsed.imageUrl);
+        }
+      }
+    } catch {}
+  }, []);
+
   const staffBodyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [showStaffLinkModal, setShowStaffLinkModal] = useState(false);
   const [staffLinkInitialText, setStaffLinkInitialText] = useState('');
@@ -230,7 +268,6 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
       }
     }, 10);
   };
-  const [storyImageUrl, setStoryImageUrl] = useState('');
   const [storyPlacement, setStoryPlacement] = useState<'standard' | 'notable' | 'spotlight' | 'lead'>('standard');
   const [isLeadStory, setIsLeadStory] = useState(false);
   const [isBreaking, setIsBreaking] = useState(false);
@@ -1036,9 +1073,19 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
   };
 
   // Submit News Story
-  const handlePublishNews = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!storyTitle.trim()) return;
+  const handlePublishNews = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!storyTitle.trim()) {
+      alert('Please enter an Article Headline before publishing.');
+      return;
+    }
+    if (!storyBody.trim()) {
+      alert('Please write or paste the Article Body before publishing.');
+      return;
+    }
     setIsPublishingNews(true);
     setNewsSuccess(false);
 
@@ -1070,6 +1117,9 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
       const data = await res.json();
       if (data.success) {
         setNewsSuccess(true);
+        try {
+          localStorage.removeItem('lankaecon_staff_news_draft');
+        } catch {}
         const publishedArt = data.article || {
           article_id: data.article_id || Date.now(),
           title: submittedTitle,
@@ -2272,7 +2322,7 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
             </div>
           )}
 
-          <form onSubmit={handlePublishNews} className="space-y-4 text-xs">
+          <div className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-slate-700 font-bold mb-1">Article Headline *</label>
@@ -2477,14 +2527,15 @@ export const StaffPortalSection: React.FC<StaffPortalSectionProps> = ({
             </div>
 
             <button
-              type="submit"
+              type="button"
+              onClick={() => handlePublishNews()}
               disabled={isPublishingNews}
               className="w-full bg-[#0B1E36] hover:bg-slate-900 text-white font-extrabold py-3 uppercase tracking-wider text-xs transition cursor-pointer flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4 text-[#0284C7]" />
               <span>{isPublishingNews ? 'Publishing...' : 'Publish Story Live'}</span>
             </button>
-          </form>
+          </div>
 
           {/* EDITORIAL MANAGEMENT TABLE FOR SETTING LEAD STORY & BREAKING NEWS WITH 3-YEAR ARCHIVE, SEARCH, WRITER FILTER & PAGE SIFTER */}
           <div className="pt-8 border-t-2 border-[#0B1E36] space-y-4">

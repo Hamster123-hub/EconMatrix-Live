@@ -158,6 +158,44 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
     setHasUnsavedChanges(true);
   }, [title, deck, category, body, imageUrl, imageCaption, authorName, readingTime, placement, isLeadStory, isBreaking, isFeatured, isSubscriptionOnly, siTitle, siDeck, siBody, taTitle, taDeck, taBody]);
 
+  // Auto-save draft in localStorage to ensure edited story is NEVER lost
+  useEffect(() => {
+    if (hasUnsavedChanges && (title.trim() || body.trim())) {
+      try {
+        localStorage.setItem(
+          `lankaecon_editor_draft_${article.article_id}`,
+          JSON.stringify({
+            title,
+            deck,
+            body,
+            category,
+            imageUrl,
+            imageCaption,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {}
+    }
+  }, [hasUnsavedChanges, title, deck, body, category, imageUrl, imageCaption, article.article_id]);
+
+  // Restore draft if saved version exists
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem(`lankaecon_editor_draft_${article.article_id}`);
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.body && parsed.body !== article.body) {
+          setBody(parsed.body);
+          if (parsed.title) setTitle(parsed.title);
+          if (parsed.deck) setDeck(parsed.deck);
+          if (parsed.imageUrl) setImageUrl(parsed.imageUrl);
+          if (parsed.imageCaption) setImageCaption(parsed.imageCaption);
+          if (parsed.category) setCategory(parsed.category);
+        }
+      }
+    } catch {}
+  }, [article.article_id]);
+
   // Word count & calculated reading time helper
   const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
   const suggestedReadingTime = Math.max(1, Math.ceil(wordCount / 200));
@@ -265,7 +303,10 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
   };
 
   const handleSave = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!title.trim()) {
       setErrorMessage('Story Headline / Title is required before saving.');
       setActiveTab('editor');
@@ -324,6 +365,9 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
       const data = await res.json();
       if (data.success) {
         setHasUnsavedChanges(false);
+        try {
+          localStorage.removeItem(`lankaecon_editor_draft_${article.article_id}`);
+        } catch {}
         setSuccessMessage(`Story #${article.article_id} successfully saved and published live by ${editorName}!`);
         if (data.article) {
           onSaved(data.article);
@@ -463,7 +507,7 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
       {/* MAIN FULL PAGE WORKSPACE */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'editor' && (
-          <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* LEFT MAIN CANVAS (8 Columns on desktop) */}
             <div className="lg:col-span-8 space-y-6">
               {/* HEADLINE & DECK CARD */}
@@ -576,7 +620,8 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
 
                 <div className="pt-2 border-t border-slate-700 flex flex-col gap-2">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={() => handleSave()}
                     disabled={isSaving}
                     className="w-full bg-[#0284C7] hover:bg-sky-600 text-white font-black text-xs uppercase tracking-wider py-3 rounded-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                   >
@@ -868,7 +913,7 @@ export const StoryEditorPage: React.FC<StoryEditorPageProps> = ({
                 </div>
               </div>
             </div>
-          </form>
+          </div>
         )}
 
         {/* TRANSLATIONS TAB (SINHALA & TAMIL FULL VIEW) */}
