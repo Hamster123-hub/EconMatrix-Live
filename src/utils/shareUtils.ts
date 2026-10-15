@@ -15,18 +15,36 @@ export interface ShareableArticle {
 }
 
 /**
+ * Production Cloud Run public URL used when running locally or in iframes
+ * Ensures WhatsApp's external web scrapers (which cannot access localhost)
+ * can crawl the OpenGraph tags and render the full article card with featured image.
+ */
+export const DEFAULT_PUBLIC_APP_URL = 'https://ais-dev-dhktrs3fzxd26b6vtickgs-381884245174.asia-east1.run.app';
+
+/**
  * Returns the effective base origin for sharing.
- * If running on localhost, checks for configured public production domain.
+ * If running on localhost or private network, guarantees a live publicly crawlable domain.
  */
 export const getArticleShareOrigin = (): string => {
-  if (typeof window === 'undefined') return '';
-  const winOrigin = window.location.origin;
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (typeof window === 'undefined') return DEFAULT_PUBLIC_APP_URL;
+  const hostname = window.location.hostname;
+  const isLocalOrPrivate =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.local') ||
+    /^192\.168\./.test(hostname) ||
+    /^10\./.test(hostname) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+
   const envUrl = (import.meta as any).env?.VITE_APP_URL;
-  if (isLocal && envUrl && typeof envUrl === 'string' && envUrl.startsWith('http')) {
-    return envUrl.replace(/\/+$/, '');
+  if (isLocalOrPrivate) {
+    if (envUrl && typeof envUrl === 'string' && envUrl.startsWith('http')) {
+      return envUrl.replace(/\/+$/, '');
+    }
+    return DEFAULT_PUBLIC_APP_URL;
   }
-  return winOrigin;
+  return window.location.origin;
 };
 
 /**
@@ -52,79 +70,240 @@ export const getArticlePathUrl = (article: { article_id: number | string; slug?:
 };
 
 /**
+ * Robustly retrieves the article's featured image as a Blob and File object.
+ * Handles:
+ * 1. Base64 data URIs
+ * 2. Uploaded / local server images
+ * 3. Remote HTTP/HTTPS images (with proxy fallback to prevent CORS blocks)
+ * 4. Dedicated server-side binary endpoint /api/articles/:id/og-image
+ */
+export const getArticleImageBlob = async (
+  article: ShareableArticle
+): Promise<{ blob: Blob; filename: string } | null> => {
+  if (typeof window === 'undefined') return null;
+
+  const rawUrl = (article.featured_image_url || '').trim();
+  const slugOrId = article.slug || String(article.article_id);
+  const fallbackEndpoint = `/api/articles/${encodeURIComponent(slugOrId)}/og-image`;
+
+  // 1. Base64 Data URI
+  if (rawUrl.startsWith('data:image/')) {
+    try {
+      const parts = rawUrl.split(',');
+      const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+      const blob = new Blob([u8arr], { type: mime });
+      return { blob, filename: `lankaecon-${article.article_id}.${ext}` };
+    } catch (e) {
+      console.warn('[ShareUtils] Failed to parse base64 image:', e);
+    }
+  }
+
+  // 2. Fetch URLs to try
+  const urlsToTry: string[] = [];
+  if (rawUrl.startsWith('/uploads/') || rawUrl.startsWith('/')) {
+    urlsToTry.push(rawUrl);
+  } else if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    urlsToTry.push(rawUrl);
+    urlsToTry.push(`/api/share/image-proxy?url=${encodeURIComponent(rawUrl)}`);
+  }
+  urlsToTry.push(fallbackEndpoint);
+
+  for (const candidate of urlsToTry) {
+    try {
+      const res = await fetch(candidate, { mode: 'cors' });
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob && blob.size > 100) {
+          const mime = blob.type || 'image/jpeg';
+          const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+          return { blob, filename: `lankaecon-${article.article_id}.${ext}` };
+        }
+      }
+    } catch {}
+  }
+
+  return null;
+};
+
+/**
+ * Converts any image Blob to PNG format for system Clipboard API compatibility.
+ */
+export const convertBlobToPng = async (blob: Blob): Promise<Blob> => {
+  if (blob.type === 'image/png') return blob;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || 1200;
+      canvas.height = img.naturalHeight || 630;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((b) => resolve(b || blob), 'image/png');
+      } else {
+        resolve(blob);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(blob);
+    };
+    img.src = url;
+  });
+};
+
+/**
+ * Copies the story image directly to the user's system clipboard (PNG format).
+ */
+export const copyArticleImageToClipboard = async (article: ShareableArticle): Promise<boolean> => {
+  try {
+    const imgData = await getArticleImageBlob(article);
+    if (!imgData) return false;
+    const pngBlob = await convertBlobToPng(imgData.blob);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && (navigator.clipboard as any).write) {
+      await (navigator.clipboard as any).write([
+        new ClipboardItem({ 'image/png': pngBlob }),
+      ]);
+      return true;
+    }
+  } catch (e) {
+    console.warn('[ShareUtils] Clipboard image write notice:', e);
+  }
+  return false;
+};
+
+/**
  * Builds the official WhatsApp share URL.
- * Uses the universal 'https://wa.me/?text=...' standard, which automatically:
- * - Launches native WhatsApp on iOS and Android smartphones without extra dialogs.
- * - Opens WhatsApp Web or WhatsApp Desktop on desktop browsers.
- * Formats the headline in WhatsApp bold (*Title*) followed by the clean direct link on its own line
- * so WhatsApp's OpenGraph scraper generates a full rich card preview with the article's featured image.
+ * Uses the universal 'https://wa.me/?text=...' standard.
  */
 export const getWhatsAppShareUrl = (article: ShareableArticle): string => {
   const shareUrl = getArticlePathUrl(article);
   const title = (article.title || '').trim();
-  const text = `*${title}*\n\n${shareUrl}`;
+  const deck = (article.deck || '').trim();
+  const text = `*${title}*${deck ? `\n\n_${deck}_` : ''}\n\n${shareUrl}`;
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 };
 
-/**
- * Direct action to trigger WhatsApp sharing with mobile/desktop intelligence.
- * Prevents navigation bugs and handles app-switching smoothly.
- */
-export const openWhatsAppShare = (article: ShareableArticle): void => {
-  if (typeof window === 'undefined') return;
-  const shareUrl = getArticlePathUrl(article);
-  const title = (article.title || '').trim();
-  const text = `*${title}*\n\n${shareUrl}`;
-  const encodedText = encodeURIComponent(text);
-
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  if (isMobile) {
-    // Open wa.me directly which mobile OS intercepts to open native WhatsApp app
-    window.location.href = `https://wa.me/?text=${encodedText}`;
-  } else {
-    // Desktop: open WhatsApp Web in new tab
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
-  }
-};
+export interface WhatsAppShareNotification {
+  article: ShareableArticle;
+  shareUrl: string;
+  hasCopiedImage: boolean;
+  imageBlobUrl?: string;
+  method: 'native_file_share' | 'clipboard_and_web';
+}
 
 /**
- * Shares the actual article featured image file directly to WhatsApp (or native share sheet)
- * on smartphones, with the story headline and link attached as the image caption.
+ * Complete WhatsApp Sharing Solution:
+ * When the WhatsApp logo is clicked:
+ * 1. Mobile (iOS Safari / Android Chrome): Launches native share sheet with the actual image File attached,
+ *    so WhatsApp opens in image-sharing mode with the headline and link as the image caption.
+ * 2. Desktop (WhatsApp Web): Copies the image directly to system clipboard, opens WhatsApp Web
+ *    with the story text and public link, and shows an instant floating banner with image preview and 1-click controls.
  */
-export const shareArticleImageDirect = async (article: ShareableArticle): Promise<boolean> => {
+export const shareArticleToWhatsApp = async (article: ShareableArticle): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
 
   const shareUrl = getArticlePathUrl(article);
   const title = (article.title || '').trim();
-  const caption = `*${title}*\n\nRead full story: ${shareUrl}`;
+  const deck = (article.deck || '').trim();
+  const caption = `*${title}*${deck ? `\n\n_${deck}_` : ''}\n\n📰 Read full story: ${shareUrl}`;
+  const encodedText = encodeURIComponent(caption);
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  // If browser supports sharing image files via Web Share API (mobile iOS Safari / Android Chrome)
-  if (article.featured_image_url && typeof navigator !== 'undefined' && (navigator as any).share && (navigator as any).canShare) {
+  // Retrieve story image binary
+  const imgData = await getArticleImageBlob(article);
+  let file: File | null = null;
+  if (imgData) {
+    file = new File([imgData.blob], imgData.filename, { type: imgData.blob.type || 'image/jpeg' });
+  }
+
+  // 1. Native Web Share API with Files (Standard for mobile phones)
+  if (file && typeof navigator !== 'undefined' && (navigator as any).share && (navigator as any).canShare) {
     try {
-      const response = await fetch(article.featured_image_url, { mode: 'cors' });
-      if (response.ok) {
-        const blob = await response.blob();
-        const extension = blob.type.includes('png') ? 'png' : 'jpg';
-        const file = new File([blob], `lankaecon-${article.article_id}.${extension}`, { type: blob.type || 'image/jpeg' });
-
-        if ((navigator as any).canShare({ files: [file] })) {
-          await (navigator as any).share({
-            title,
-            text: caption,
-            files: [file],
-          });
-          return true;
-        }
+      if ((navigator as any).canShare({ files: [file] })) {
+        await (navigator as any).share({
+          title,
+          text: caption,
+          files: [file],
+        });
+        return true;
       }
     } catch (err: any) {
-      if (err?.name === 'AbortError') return true; // User cancelled share sheet
-      console.warn('Native image file share notice:', err);
+      if (err?.name === 'AbortError') {
+        // User dismissed the share sheet voluntarily
+        return true;
+      }
+      console.warn('[ShareUtils] Native file share notice:', err);
     }
   }
 
-  // Fallback to standard WhatsApp share link
-  openWhatsAppShare(article);
-  return false;
+  // 2. Desktop / WhatsApp Web workflow
+  let hasCopiedImage = false;
+  let imageBlobUrl: string | undefined;
+
+  if (imgData) {
+    imageBlobUrl = URL.createObjectURL(imgData.blob);
+    try {
+      const pngBlob = await convertBlobToPng(imgData.blob);
+      if (typeof navigator !== 'undefined' && navigator.clipboard && (navigator.clipboard as any).write) {
+        await (navigator.clipboard as any).write([
+          new ClipboardItem({ 'image/png': pngBlob }),
+        ]);
+        hasCopiedImage = true;
+      }
+    } catch (clipErr) {
+      console.warn('[ShareUtils] Clipboard copy image not allowed:', clipErr);
+    }
+  }
+
+  // Open WhatsApp
+  if (isMobile) {
+    window.location.href = `https://wa.me/?text=${encodedText}`;
+  } else {
+    window.open(`https://web.whatsapp.com/send?text=${encodedText}`, '_blank', 'noopener,noreferrer');
+  }
+
+  // Trigger floating toast notification with image preview and paste instruction
+  try {
+    window.dispatchEvent(
+      new CustomEvent('whatsapp-share-notify', {
+        detail: {
+          article,
+          shareUrl,
+          hasCopiedImage,
+          imageBlobUrl,
+          method: 'clipboard_and_web',
+        } as WhatsAppShareNotification,
+      })
+    );
+  } catch {}
+
+  return true;
+};
+
+/**
+ * Universal action when WhatsApp button or logo is clicked.
+ * Guaranteed to share the image along with the article.
+ */
+export const openWhatsAppShare = (article: ShareableArticle): void => {
+  shareArticleToWhatsApp(article);
+};
+
+/**
+ * Direct file sharing helper (alias for shareArticleToWhatsApp)
+ */
+export const shareArticleImageDirect = async (article: ShareableArticle): Promise<boolean> => {
+  return shareArticleToWhatsApp(article);
 };
 
 /**

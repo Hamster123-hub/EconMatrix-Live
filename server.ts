@@ -8002,57 +8002,152 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
     res.json({ success: true, message: 'Stripe Webhook processed & posted to Automated Accounting Ledger.', txRef });
   });
 
+  // In-memory cache for remote article OpenGraph & WhatsApp images
+  const ogImageBinaryCache = new Map<string, { buffer: Buffer; contentType: string; expiry: number }>();
+
   // Dedicated Binary Endpoint for Article OpenGraph & WhatsApp Images
-  app.get(['/api/articles/:id/og-image', '/story/:id/og-image'], (req, res) => {
-    const idOrSlug = req.params.id;
-    const matcher = (a: Article) =>
-      String(a.article_id) === idOrSlug ||
-      (a.slug && a.slug.toLowerCase() === idOrSlug.toLowerCase()) ||
-      (a.slug && a.slug.replace(/[^a-z0-9]/gi, '') === idOrSlug.replace(/[^a-z0-9]/gi, ''));
+  // Returns HTTP 200 OK directly with binary image data (CRITICAL: WhatsApp crawler rejects 302 redirects for og:image)
+  app.get(['/api/articles/:id/og-image', '/story/:id/og-image'], async (req, res) => {
+    try {
+      const idOrSlug = req.params.id;
+      const matcher = (a: Article) =>
+        String(a.article_id) === idOrSlug ||
+        (a.slug && a.slug.toLowerCase() === idOrSlug.toLowerCase()) ||
+        (a.slug && a.slug.replace(/[^a-z0-9]/gi, '') === idOrSlug.replace(/[^a-z0-9]/gi, ''));
 
-    const article = articlesStore.find(matcher) || INITIAL_ARTICLES.find(matcher);
-    let img = (article?.featured_image_url || '').trim();
+      const article = articlesStore.find(matcher) || INITIAL_ARTICLES.find(matcher);
+      let img = (article?.featured_image_url || '').trim();
 
-    if (!img && article?.inline_images && article.inline_images.length > 0) {
-      img = article.inline_images[0].url || article.inline_images[0].image1?.url || '';
-    }
-    if (!img && article?.gallery && article.gallery.length > 0) {
-      img = article.gallery[0] || '';
-    }
-    if (!img) {
-      img = 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80';
-    }
-
-    // 1. Base64 data URI
-    if (img.startsWith('data:image/')) {
-      const match = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
-      if (match) {
-        const mime = `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`;
-        const buffer = Buffer.from(match[2], 'base64');
-        res.setHeader('Content-Type', mime);
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('Content-Length', buffer.length);
-        return res.send(buffer);
+      if (!img && article?.inline_images && article.inline_images.length > 0) {
+        img = article.inline_images[0].url || article.inline_images[0].image1?.url || '';
       }
-    }
-
-    // 2. Local uploads path
-    if (img.startsWith('/uploads/')) {
-      const fileName = path.basename(img);
-      const filePath = path.join(UPLOADS_DIR, fileName);
-      if (fs.existsSync(filePath)) {
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        return res.sendFile(filePath);
+      if (!img && article?.gallery && article.gallery.length > 0) {
+        img = article.gallery[0] || '';
       }
-      return res.redirect(302, getCategoryEditorialFallbackImage(article?.primary_category));
-    }
+      if (!img) {
+        img = getCategoryEditorialFallbackImage(article?.primary_category);
+      }
 
-    // 3. Remote URL
-    if (img.startsWith('http://') || img.startsWith('https://')) {
-      return res.redirect(302, img);
-    }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
 
-    return res.redirect(302, getCategoryEditorialFallbackImage(article?.primary_category));
+      // 1. Base64 data URI
+      if (img.startsWith('data:image/')) {
+        const match = img.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+        if (match) {
+          const mime = `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`;
+          const buffer = Buffer.from(match[2], 'base64');
+          res.setHeader('Content-Type', mime);
+          res.setHeader('Content-Length', buffer.length);
+          return res.status(200).send(buffer);
+        }
+      }
+
+      // 2. Local uploads path
+      if (img.startsWith('/uploads/')) {
+        const fileName = path.basename(img);
+        const filePath = path.join(UPLOADS_DIR, fileName);
+        if (fs.existsSync(filePath)) {
+          const ext = path.extname(fileName).toLowerCase();
+          const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+          res.setHeader('Content-Type', mime);
+          return res.sendFile(filePath);
+        }
+        img = getCategoryEditorialFallbackImage(article?.primary_category);
+      }
+
+      // 3. Remote URL: fetch and buffer with HTTP 200 OK (WhatsApp scraper does NOT accept 302 redirects)
+      if (img.startsWith('http://') || img.startsWith('https://')) {
+        const cached = ogImageBinaryCache.get(img);
+        if (cached && Date.now() < cached.expiry) {
+          res.setHeader('Content-Type', cached.contentType);
+          res.setHeader('Content-Length', cached.buffer.length);
+          return res.status(200).send(cached.buffer);
+        }
+
+        try {
+          const remoteRes = await fetch(img, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; LankaEcon-OpenGraph/1.0; +https://ais-dev-dhktrs3fzxd26b6vtickgs-381884245174.asia-east1.run.app)',
+              'Accept': 'image/jpeg,image/png,image/webp,image/*;q=0.8',
+            },
+            signal: AbortSignal.timeout(5000),
+          });
+
+          if (remoteRes.ok) {
+            const arrayBuf = await remoteRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuf);
+            const contentType = remoteRes.headers.get('content-type') || 'image/jpeg';
+            ogImageBinaryCache.set(img, { buffer, contentType, expiry: Date.now() + 3600000 });
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Length', buffer.length);
+            return res.status(200).send(buffer);
+          }
+        } catch (fetchErr) {
+          console.warn('[OG-Image] Direct remote fetch failed, falling back:', fetchErr);
+        }
+      }
+
+      // 4. Fallback category image
+      const fallbackUrl = getCategoryEditorialFallbackImage(article?.primary_category);
+      if (fallbackUrl && fallbackUrl !== img) {
+        try {
+          const fallbackRes = await fetch(fallbackUrl, { signal: AbortSignal.timeout(4000) });
+          if (fallbackRes.ok) {
+            const arrayBuf = await fallbackRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuf);
+            res.setHeader('Content-Type', 'image/jpeg');
+            return res.status(200).send(buffer);
+          }
+        } catch {}
+      }
+
+      // Default minimal 1x1 JPEG fallback
+      const minimalJpg = Buffer.from(
+        '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+        'base64'
+      );
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.status(200).send(minimalJpg);
+    } catch (err) {
+      console.error('[OG-Image] Critical handler error:', err);
+      res.status(500).send('Internal Image Error');
+    }
+  });
+
+  // Universal Image Proxy with Access-Control-Allow-Origin: * for seamless Web Share & Clipboard API
+  app.get('/api/share/image-proxy', async (req, res) => {
+    try {
+      const targetUrl = req.query.url as string;
+      if (!targetUrl || (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://'))) {
+        return res.status(400).send('Missing or invalid image url parameter');
+      }
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+
+      const cached = ogImageBinaryCache.get(targetUrl);
+      if (cached && Date.now() < cached.expiry) {
+        res.setHeader('Content-Type', cached.contentType);
+        return res.status(200).send(cached.buffer);
+      }
+
+      const proxyRes = await fetch(targetUrl, { signal: AbortSignal.timeout(6000) });
+      if (!proxyRes.ok) {
+        return res.status(proxyRes.status).send('Failed to fetch target image');
+      }
+
+      const arrayBuf = await proxyRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+      const contentType = proxyRes.headers.get('content-type') || 'image/jpeg';
+      ogImageBinaryCache.set(targetUrl, { buffer, contentType, expiry: Date.now() + 3600000 });
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', buffer.length);
+      return res.status(200).send(buffer);
+    } catch (err: any) {
+      return res.status(500).send('Proxy error: ' + (err?.message || 'unknown'));
+    }
   });
 
   function getCategoryEditorialFallbackImage(category?: string): string {
@@ -8166,25 +8261,8 @@ FORMAT YOUR RESPONSE IN JSON STRICTLY:
       rawImage = article.gallery[0] || '';
     }
 
-    if (rawImage.startsWith('data:image/')) {
-      // WhatsApp CANNOT fetch data: URIs; point to dedicated binary endpoint
-      safeImage = `${baseUrl}/api/articles/${encodeURIComponent(slugOrId)}/og-image`;
-    } else if (rawImage.startsWith('/uploads/')) {
-      const fileName = path.basename(rawImage);
-      const filePath = path.join(UPLOADS_DIR, fileName);
-      if (fs.existsSync(filePath)) {
-        safeImage = `${baseUrl}${rawImage}`;
-      } else {
-        // Fall back to category-specific high-resolution photography
-        safeImage = getCategoryEditorialFallbackImage(article.primary_category);
-      }
-    } else if (rawImage.startsWith('/')) {
-      safeImage = `${baseUrl}${rawImage}`;
-    } else if (rawImage.startsWith('http://') || rawImage.startsWith('https://')) {
-      safeImage = rawImage;
-    } else {
-      safeImage = getCategoryEditorialFallbackImage(article.primary_category);
-    }
+    // WhatsApp, Facebook, iMessage & Twitter crawlers require direct 200 OK responses on the canonical domain
+    safeImage = `${baseUrl}/api/articles/${encodeURIComponent(slugOrId)}/og-image`;
 
     let imageMimeType = 'image/jpeg';
     if (/\.png($|\?)/i.test(safeImage) || safeImage.includes('format=png')) {

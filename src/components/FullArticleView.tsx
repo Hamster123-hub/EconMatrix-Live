@@ -26,6 +26,7 @@ import {
   getArticleShareUrl,
   getWhatsAppShareUrl,
   openWhatsAppShare,
+  shareArticleToWhatsApp,
   shareArticleImageDirect,
   getTwitterShareUrl,
   copyArticleShareUrl,
@@ -573,17 +574,10 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
               SHARE :
             </span>
             
-            <a
-              href={getWhatsAppShareUrl({
-                article_id: article.article_id,
-                slug: article.slug,
-                title: displayTitle,
-                featured_image_url: article.featured_image_url,
-                deck: article.deck,
-              })}
-              onClick={(e) => {
+            <button
+              onClick={async (e) => {
                 e.preventDefault();
-                openWhatsAppShare({
+                await shareArticleToWhatsApp({
                   article_id: article.article_id,
                   slug: article.slug,
                   title: displayTitle,
@@ -591,18 +585,16 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
                   deck: article.deck,
                 });
               }}
-              target="_blank"
-              rel="noopener noreferrer"
               className="w-8 h-8 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
-              title="Share on WhatsApp (with rich preview card & image)"
+              title="Share story with image on WhatsApp"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
-            </a>
+            </button>
 
             {article.featured_image_url && (
               <button
-                onClick={() => {
-                  shareArticleImageDirect({
+                onClick={async () => {
+                  await shareArticleToWhatsApp({
                     article_id: article.article_id,
                     slug: article.slug,
                     title: displayTitle,
@@ -615,10 +607,10 @@ export const FullArticleView: React.FC<FullArticleViewProps> = ({
                     ? 'bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
                 }`}
-                title="Send story image directly to WhatsApp chat"
+                title="Share story image directly to WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 text-emerald-600 fill-current" />
-                <span className="text-[11px]">Send Image</span>
+                <span className="text-[11px]">Share Image</span>
               </button>
             )}
 

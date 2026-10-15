@@ -22,6 +22,7 @@ import { renderArticleParagraph, renderArticleBody, ImageZoomModal } from '../ut
 import {
   getWhatsAppShareUrl,
   openWhatsAppShare,
+  shareArticleToWhatsApp,
   getTwitterShareUrl,
   copyArticleShareUrl,
   shareArticleNativeOrCopy,
@@ -404,17 +405,10 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                 SHARE:
               </span>
               
-              <a
-                href={getWhatsAppShareUrl({
-                  article_id: article.article_id,
-                  slug: article.slug,
-                  title: displayTitle,
-                  featured_image_url: article.featured_image_url,
-                  deck: article.deck,
-                })}
-                onClick={(e) => {
+              <button
+                onClick={async (e) => {
                   e.preventDefault();
-                  openWhatsAppShare({
+                  await shareArticleToWhatsApp({
                     article_id: article.article_id,
                     slug: article.slug,
                     title: displayTitle,
@@ -422,13 +416,11 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({
                     deck: article.deck,
                   });
                 }}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="w-7 h-7 rounded-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center justify-center transition cursor-pointer shadow-2xs"
-                title="Share on WhatsApp"
+                title="Share story with image on WhatsApp"
               >
                 <MessageCircle className="w-3.5 h-3.5 fill-current" />
-              </a>
+              </button>
 
               <a
                 href={getTwitterShareUrl({

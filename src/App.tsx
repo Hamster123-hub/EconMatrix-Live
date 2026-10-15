@@ -23,6 +23,7 @@ import { RightSidebar } from './components/RightSidebar';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { SubscriberPreferencesModal } from './components/SubscriberPreferencesModal';
 import { WhatsAppModal } from './components/WhatsAppModal';
+import { WhatsAppShareToast } from './components/WhatsAppShareToast';
 import { Footer } from './components/Footer';
 import { ScrollToTopButton } from './components/ScrollToTopButton';
 import { PaginationBar } from './components/PaginationBar';
@@ -1001,6 +1002,9 @@ export default function App() {
         isOpen={isWhatsAppModalOpen}
         onClose={() => setIsWhatsAppModalOpen(false)}
       />
+
+      {/* Floating WhatsApp Share Toast with Image Preview & Controls */}
+      <WhatsAppShareToast />
 
       {/* Staff Instagram Story Generator Modal */}
       <InstagramStoryModal
